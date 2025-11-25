@@ -1,68 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  /* 定义科技感主题色板 - Tailwind v4 会自动生成 bg-tech-bg, text-tech-alert 等类名 */
+  --color-tech-bg: #050b14;
+  --color-tech-panel: rgba(13, 24, 48, 0.7);
+  --color-tech-panel-border: #1e3a8a;
+  --color-tech-blue: #3b82f6;
+  --color-tech-cyan: #06b6d4;
+  --color-tech-glow: #00f0ff;
+  --color-tech-alert: #ef4444;
+  --color-tech-warning: #f59e0b;
+  --color-tech-success: #10b981;
+  --color-tech-text: #f1f5f9;
+  --color-tech-text-dim: #94a3b8;
+
+  /* 自定义背景图 */
+  --background-image-tech-grid: linear-gradient(rgba(30, 58, 138, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 58, 138, 0.1) 1px, transparent 1px);
+
+  /* 扩展动画 */
+  --animate-scan: scan 2s linear infinite;
+  --animate-grid-fade: gridFade 3s ease-in-out infinite alternate;
+  --animate-slide-right: slideRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-slide-left: slideLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-zoom-in: zoomIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  @keyframes gridFade {
+    from { opacity: 0.1; }
+    to { opacity: 0.3; }
+  }
+
+  @keyframes slideRight {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slideLeft {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes zoomIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+}
+
+/* 基础样式重置与全局设置 */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  color-scheme: dark;
 }
 
 body {
+  background-color: var(--color-tech-bg);
+  color: var(--color-tech-text);
+  overflow: hidden;
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+::-webkit-scrollbar-track {
+  background-color: var(--color-tech-bg);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-tech-panel-border);
+  border-radius: 0.25rem;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-tech-blue);
+}
+
+/* 实用工具类 */
+@utility text-shadow-glow {
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 4px;
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(30, 58, 138, 0.5);
+    border-radius: 2px;
   }
 }
