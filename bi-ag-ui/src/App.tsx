@@ -10,6 +10,7 @@ import { Sparkles, Map, Grid3X3 } from 'lucide-react';
 import { CameraTree } from './components/monitor/CameraTree';
 import { MonitorGrid } from './components/monitor/MonitorGrid';
 import { AlertView } from './components/alert/AlertView';
+import { PatrolView } from './components/patrol/PatrolView';
 import { TechPanel } from './components/ui/TechPanel';
 
 function App() {
@@ -148,9 +149,22 @@ function App() {
                 <AlertView />
               </motion.div>
             )}
+
+            {/* 4. 巡查治理 (Patrol) */}
+            {currentView === 'patrol' && (
+              <motion.div
+                key="patrol"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="h-full w-full"
+              >
+                <PatrolView />
+              </motion.div>
+            )}
             
-            {/* 4. 其他页面占位 */}
-            {['patrol', 'broadcast'].includes(currentView) && (
+            {/* 5. 其他页面占位 */}
+            {['broadcast'].includes(currentView) && (
               <motion.div 
                 key="placeholder"
                 initial={{ opacity: 0 }}
