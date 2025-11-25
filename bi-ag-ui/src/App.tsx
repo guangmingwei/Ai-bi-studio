@@ -15,9 +15,16 @@ import { BroadcastView } from './components/broadcast/BroadcastView';
 import { TechPanel } from './components/ui/TechPanel';
 import { GlobalAlert } from './components/ui/GlobalAlert';
 import { GuideOverlay } from './components/ui/GuideOverlay';
+import { useAppKnowledge } from './ai/hooks/useAppKnowledge';
+import { useAppActions } from './ai/hooks/useAppActions';
+import { CustomChatWidget } from './ai/components/CustomChatWidget';
 
 function App() {
   const { isNavOpen, navPosition, toggleNav, centerMode, setCenterMode, currentView, isEmergency, setEmergency, setCurrentView, setAlertNotification } = useAppStore();
+
+  // Initialize AI Hooks
+  useAppKnowledge();
+  useAppActions();
 
   // 模拟随机触发预警 (仅用于演示)
   useEffect(() => {
@@ -100,6 +107,9 @@ function App() {
 
       {/* 新手引导层 */}
       <GuideOverlay />
+
+      {/* AI 自定义对话窗口 */}
+      <CustomChatWidget />
 
       {/* 动态背景层 (由于主内容位移，背景最好固定) */}
       <div className="fixed inset-0 pointer-events-none z-0">
