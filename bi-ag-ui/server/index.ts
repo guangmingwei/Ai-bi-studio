@@ -24,17 +24,31 @@ const copilotRuntime = new CopilotRuntime();
 
 const SYSTEM_PROMPT = `你是一个AI综合安防风险治理平台的智能助手。
 你的职责是协助用户管理安防系统、监控视频流、处理警报和执行巡逻任务。
+
 请严格遵守以下要求：
-1. **语言要求**：所有回复（包括思考过程）必须严格使用**中文**。
-2. **思考过程**：在回答前，请先进行深入思考，分析用户意图和当前系统状态。
-3. **隐式思考**：你的思考过程将被折叠显示，请专注于分析，但不要在思考过程中直接与用户对话。
-4. **回复风格**：专业、客观、简洁、高效。直接解决用户问题，不要有过多的寒暄。
-5. **上下文意识**：时刻关注提供的系统状态（如activeAlerts, currentView等），并据此调整建议。`;
+1. **语言要求**：所有回复必须严格使用**中文**。
+2. **回复风格**：专业、客观、简洁、高效。直接解决用户问题，不要有过多的寒暄。
+3. **上下文意识**：时刻关注提供的系统状态（如activeAlerts, currentView等），并据此调整建议。
+
+**重要规则 - 工具调用时必须返回文字说明**：
+- 当你调用任何工具（函数）时，**必须同时返回中文文字说明你执行了什么操作**
+- 例如：调用 setEmergencyMode({active: true}) 后，必须回复 "已启动紧急警报模式"
+- 例如：调用 navigateToPage({page: "monitor"}) 后，必须回复 "已切换到监控中心"
+- 例如：调用 toggleSidebar() 后，必须回复 "已切换侧边栏显示状态"
+- **永远不要只调用工具而不返回任何文字**，这会导致系统错误
+
+可用功能：
+- 导航页面：综合态势(dashboard)、监控中心(monitor)、预警中心(alert)、巡查治理(patrol)、广播喊话(broadcast)
+- 切换模式：监控墙(video-grid)、地图(map)、AI助手(ai-chat)
+- 紧急模式：启动/关闭应急响应
+- 巡逻配置：自动切换摄像头
+- 侧边栏控制`;
+
 
 class SiliconFlowAdapter extends OpenAIAdapter {
     constructor() {
-        // Changed model to Kimi-K2-Thinking as requested
-        super({ openai: openai as any, model: "moonshotai/Kimi-K2-Thinking" });
+        // Changed to MiniMax-M2 (non-thinking model) to avoid infinite loops
+        super({ openai: openai as any, model: "MiniMaxAI/MiniMax-M2" });
     }
 
     async process(request: any): Promise<any> {
@@ -43,46 +57,54 @@ class SiliconFlowAdapter extends OpenAIAdapter {
         
         console.log(`[SiliconFlowAdapter] Processing request. Actions count: ${actions?.length || 0}`);
 
-        // 1. Better Message Role Mapping Logic and System Prompt Injection
-        const openAIMessages = messages.map((msg: any) => {
-             let role = 'user'; // Default fallback
-             let content = msg.content;
+        // 1. Improved Message Role Mapping - Keep more history for proper context
+        const openAIMessages = messages
+            .map((msg: any, index: number) => {
+                let role = 'user'; // Default fallback
+                let content = msg.content;
 
-             if (msg.role === 'system') {
-                 role = 'system';
-             } else if (msg.role === 'assistant') {
-                 role = 'assistant';
-             } else if (msg.role === 'user') {
-                 role = 'user';
-             } else if (msg.type === 'TextMessage') {
-                 role = msg.role || 'user'; 
-             } else if (msg.type === 'ActionExecutionMessage') {
-                 // Skip action execution messages in history - they cause issues
-                 return null;
-             } else if (msg.type === 'ResultMessage') {
-                 // Skip result messages in history - they cause issues without tool_call_id
-                 return null;
-             }
+                // More precise role mapping
+                if (msg.role === 'system') {
+                    role = 'system';
+                } else if (msg.role === 'assistant') {
+                    role = 'assistant';
+                } else if (msg.role === 'user') {
+                    role = 'user';
+                } else if (msg.type === 'TextMessage') {
+                    // TextMessage can be from user or assistant
+                    role = msg.role === 'assistant' ? 'assistant' : 'user';
+                } else if (msg.type === 'ActionExecutionMessage') {
+                    // Action execution is from assistant, but we'll skip it
+                    // to avoid tool call complexity
+                    console.log(`[SiliconFlowAdapter] Skipping ActionExecutionMessage at index ${index}`);
+                    return null;
+                } else if (msg.type === 'ResultMessage') {
+                    // Result messages need tool_call_id, so we skip them
+                    console.log(`[SiliconFlowAdapter] Skipping ResultMessage at index ${index}`);
+                    return null;
+                }
 
-             // Sanity check
-             const validRoles = ['system', 'assistant', 'user'];
-             if (!validRoles.includes(role)) {
-                 console.warn(`[SiliconFlowAdapter] Invalid role: ${role}, falling back to user`);
-                 role = 'user';
-             }
-             
-             if (typeof content !== 'string') {
-                 content = JSON.stringify(content || "");
-             }
-             
-             // Validate content
-             if (!content || content.trim() === '') {
-                 console.warn(`[SiliconFlowAdapter] Empty content for role ${role}, skipping`);
-                 return null;
-             }
+                // Validate role
+                const validRoles = ['system', 'assistant', 'user'];
+                if (!validRoles.includes(role)) {
+                    console.warn(`[SiliconFlowAdapter] Invalid role: ${role} at index ${index}, falling back to user`);
+                    role = 'user';
+                }
+                
+                // Ensure content is string
+                if (typeof content !== 'string') {
+                    content = JSON.stringify(content || "");
+                }
+                
+                // Skip empty messages
+                if (!content || content.trim() === '' || content === '{}' || content === 'null') {
+                    console.log(`[SiliconFlowAdapter] Skipping empty message at index ${index}`);
+                    return null;
+                }
 
-             return { role, content };
-        }).filter((msg: any) => msg !== null); // Remove null entries
+                return { role, content };
+            })
+            .filter((msg: any) => msg !== null); // Remove null entries
 
         console.log(`[SiliconFlowAdapter] Processed ${openAIMessages.length} messages from ${messages.length} original messages`);
 
@@ -173,16 +195,12 @@ class SiliconFlowAdapter extends OpenAIAdapter {
             let startedTextMessage = false;
             let messageId: string | undefined;
             const toolCallMap = new Map<number, string>(); // index -> id
-            
-            // State for handling reasoning collapsible
-            let hasStartedReasoning = false;
-            let hasFinishedReasoning = false;
 
             try {
-                console.log("[SiliconFlowAdapter] Requesting streaming completion from SiliconFlow (Kimi-K2-Thinking)...");
+                console.log("[SiliconFlowAdapter] Requesting streaming completion from SiliconFlow (MiniMax-M2)...");
 
                 const payload = {
-                    model: "moonshotai/Kimi-K2-Thinking",
+                    model: "MiniMaxAI/MiniMax-M2",
                     messages: openAIMessages,
                     tools: tools, 
                     stream: true,
@@ -207,29 +225,9 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     const delta = chunk.choices[0].delta;
                     if (!delta) continue;
 
-                    // Extract reasoning and content
-                    const reasoning = (delta as any).reasoning_content || "";
+                    // Handle content streaming (MiniMax-M2 doesn't have reasoning_content)
                     const content = delta.content || "";
                     
-                    // Track reasoning state but DON'T send it to the user
-                    if (reasoning && !hasStartedReasoning) {
-                        hasStartedReasoning = true;
-                        console.log("[SiliconFlowAdapter] Model started reasoning (hidden from user)");
-                    }
-
-                    // Skip reasoning chunks but don't break the stream
-                    if (reasoning && !content) {
-                        // Just reasoning, no content - skip but continue processing stream
-                        continue;
-                    }
-
-                    // If we were reasoning and now have content, mark reasoning as finished
-                    if (content && hasStartedReasoning && !hasFinishedReasoning) {
-                        hasFinishedReasoning = true;
-                        console.log("[SiliconFlowAdapter] Model finished reasoning, starting to output");
-                    }
-
-                    // Only send actual content (not reasoning)
                     if (content) {
                         if (!startedTextMessage) {
                             messageId = chunk.id || `msg_${Date.now()}`; 
@@ -245,19 +243,6 @@ class SiliconFlowAdapter extends OpenAIAdapter {
 
                     // Handle tool calls
                     if (delta.tool_calls) {
-                        // If tool calls trigger and we were thinking, ensure thinking is closed
-                         if (hasStartedReasoning && !hasFinishedReasoning) {
-                            // Send the closing tag if not sent yet
-                            const closingTag = "\n\n</details>\n\n";
-                            if (startedTextMessage && messageId) {
-                                eventStream$.sendTextMessageContent({
-                                    messageId: messageId,
-                                    content: closingTag
-                                });
-                            }
-                            hasFinishedReasoning = true;
-                        }
-
                         for (const toolCall of delta.tool_calls) {
                             const index = toolCall.index;
                             
@@ -284,18 +269,19 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     }
                 }
                 
-                // Check if we need to close the details tag at the end of stream
-                // (e.g. if the model only returned reasoning and then stopped, or errored)
-                if (hasStartedReasoning && !hasFinishedReasoning) {
-                     const closingTag = "\n\n</details>\n\n";
-                     if (startedTextMessage && messageId) {
-                        eventStream$.sendTextMessageContent({
-                            messageId: messageId,
-                            content: closingTag
-                        });
-                     }
+                // CRITICAL FIX: If only tool calls were made without any text content,
+                // send a placeholder message to prevent CopilotKit from auto-retrying
+                if (toolCallMap.size > 0 && !startedTextMessage) {
+                    messageId = `msg_${Date.now()}`;
+                    eventStream$.sendTextMessageStart({ messageId });
+                    eventStream$.sendTextMessageContent({
+                        messageId,
+                        content: "✓" // Minimal acknowledgment
+                    });
+                    eventStream$.sendTextMessageEnd({ messageId });
+                    console.log("[SiliconFlowAdapter] Added placeholder message for tool-only response");
                 }
-
+                
                 // End text message if started
                 if (startedTextMessage && messageId) {
                     eventStream$.sendTextMessageEnd({ messageId });
