@@ -11,10 +11,11 @@ import { CameraTree } from './components/monitor/CameraTree';
 import { MonitorGrid } from './components/monitor/MonitorGrid';
 import { AlertView } from './components/alert/AlertView';
 import { PatrolView } from './components/patrol/PatrolView';
+import { BroadcastView } from './components/broadcast/BroadcastView';
 import { TechPanel } from './components/ui/TechPanel';
 
 function App() {
-  const { isNavOpen, navPosition, toggleNav, centerMode, setCenterMode, currentView } = useAppStore();
+  const { isNavOpen, navPosition, toggleNav, centerMode, setCenterMode, currentView, isEmergency, setEmergency, setCurrentView } = useAppStore();
 
   // 全局快捷键监听
   useEffect(() => {
@@ -29,11 +30,20 @@ function App() {
         e.preventDefault();
         toggleNav();
       }
+      // Cmd+L / Ctrl+L -> Emergency Mode
+      if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
+        e.preventDefault();
+        // 如果已经在紧急模式，是否需要取消？根据需求描述，这里是触发。
+        // 可以做成 toggle 或者只能触发。通常紧急模式只能触发，需要手动确认关闭。
+        // 但为了测试方便，我们暂且只负责触发。
+        setEmergency(true);
+        setCurrentView('monitor');
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [centerMode, toggleNav, setCenterMode]);
+  }, [centerMode, toggleNav, setCenterMode, setEmergency, setCurrentView]);
 
   // 计算主内容的位移
   const mainVariants = {
@@ -163,8 +173,22 @@ function App() {
               </motion.div>
             )}
             
-            {/* 5. 其他页面占位 */}
-            {['broadcast'].includes(currentView) && (
+            {/* 5. 广播喊话 (Broadcast) */}
+            {currentView === 'broadcast' && (
+              <motion.div
+                key="broadcast"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="h-full w-full"
+              >
+                <BroadcastView />
+              </motion.div>
+            )}
+            
+            {/* 6. 其他页面占位 */}
+            {/* 预留给未来模块 */}
+            {false && (
               <motion.div 
                 key="placeholder"
                 initial={{ opacity: 0 }}
@@ -177,6 +201,34 @@ function App() {
           </AnimatePresence>
         </main>
       </motion.div>
+      {/* 紧急模式全屏红色警报 */}
+      <AnimatePresence>
+        {isEmergency && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center"
+          >
+             {/* 红色闪烁背景 */}
+             <div className="absolute inset-0 bg-red-500/30 animate-pulse" />
+             <div className="absolute inset-0 border-[20px] border-red-500/50 animate-pulse" />
+             
+             {/* 警报文字 - 允许点击交互以解除 */}
+             <div className="relative pointer-events-auto bg-black/80 border border-red-500 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-[0_0_50px_rgba(239,68,68,0.5)]">
+                <div className="text-6xl animate-bounce">🚨</div>
+                <h1 className="text-4xl font-bold text-red-500 tracking-widest uppercase">Emergency Alert</h1>
+                <p className="text-red-300 text-lg">全域紧急疏散广播正在播放中...</p>
+                <button 
+                  onClick={() => setEmergency(false)}
+                  className="mt-4 px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded shadow-lg transition-colors"
+                >
+                  解除警报
+                </button>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

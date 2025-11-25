@@ -7,6 +7,8 @@ const videos = Array.from({ length: 9 }, (_, i) => ({
   status: i % 3 === 0 ? 'REC' : 'LIVE'
 }));
 
+const VIDEO_SOURCE = "http://192.168.1.210:18000/m4s/live/stream_3_0.mp4?play_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjI3NjQwNDE3NTcsImlzcyI6InRzaW5nc2VlLWVhc3ljdnIifQ.2onoGTiix77kt44TCuzwtLF6RcXMdDXzrZPQRX5mIu8";
+
 export const MonitorGrid: React.FC = () => {
   const [gridSize, setGridSize] = useState<4 | 9>(4);
 
@@ -41,11 +43,19 @@ export const MonitorGrid: React.FC = () => {
       <div className={`grid gap-2 flex-1 min-h-0 ${gridSize === 4 ? 'grid-cols-2 grid-rows-2' : 'grid-cols-3 grid-rows-3'}`}>
          {videos.slice(0, gridSize).map(v => (
             <div key={v.id} className="relative bg-black rounded-lg overflow-hidden border border-white/10 group">
-               {/* 模拟画面 */}
-               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-50 group-hover:opacity-70 transition-opacity"></div>
+               <div className="absolute inset-0 bg-black">
+                  <video 
+                    className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                    src={VIDEO_SOURCE}
+                    autoPlay 
+                    muted 
+                    loop 
+                    playsInline
+                  />
+               </div>
                
                {/* 状态栏 */}
-               <div className="absolute top-2 left-2 right-2 flex justify-between items-center">
+               <div className="absolute top-2 left-2 right-2 flex justify-between items-center z-10">
                   <span className="bg-black/50 backdrop-blur px-2 py-1 rounded text-xs text-white border border-white/10">{v.loc}</span>
                   {v.status === 'LIVE' ? (
                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_5px_red]"></div>
@@ -55,7 +65,7 @@ export const MonitorGrid: React.FC = () => {
                </div>
 
                {/* 操作层 */}
-               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[1px]">
+               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[1px] z-10">
                   <button className="p-2 rounded-full bg-white/10 border border-white/20 hover:bg-blue-500 hover:border-blue-400 transition-colors text-white">
                      <Maximize2 size={20} />
                   </button>
@@ -66,4 +76,3 @@ export const MonitorGrid: React.FC = () => {
     </div>
   );
 };
-

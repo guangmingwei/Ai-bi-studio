@@ -21,6 +21,10 @@ interface AppState {
 
   // 全局快捷键监听状态
   isCmdKPressed: boolean;
+
+  // 紧急模式
+  isEmergency: boolean;
+  setEmergency: (active: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -36,5 +40,8 @@ export const useAppStore = create<AppState>((set) => ({
   setCenterMode: (mode) => set({ centerMode: mode }),
 
   isCmdKPressed: false,
+
+  isEmergency: false,
+  setEmergency: (active) => set({ isEmergency: active }),
 }));
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Maximize2, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 const videos = [
   { id: 1, loc: '北门入口 CAM-01', status: 'LIVE' },
@@ -8,16 +8,27 @@ const videos = [
   { id: 4, loc: '地下车库 CAM-12', status: 'LIVE' },
 ];
 
+// 使用统一的视频源
+const VIDEO_SOURCE = "http://192.168.1.210:18000/m4s/live/stream_3_0.mp4?play_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjI3NjQwNDE3NTcsImlzcyI6InRzaW5nc2VlLWVhc3ljdnIifQ.2onoGTiix77kt44TCuzwtLF6RcXMdDXzrZPQRX5mIu8";
+
 export const VideoGrid: React.FC = () => {
   return (
     <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-3 p-3">
       {videos.map((v) => (
         <div key={v.id} className="relative rounded-xl overflow-hidden bg-slate-900/80 group shadow-lg border border-white/5">
-          {/* 模拟画面底图 - 实际上这里会是 Video 标签 */}
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
+          <div className="absolute inset-0 bg-black">
+            <video 
+              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500"
+              src={VIDEO_SOURCE}
+              autoPlay 
+              muted 
+              loop 
+              playsInline
+            />
+          </div>
           
           {/* 悬浮顶栏 */}
-          <div className="absolute top-0 left-0 w-full p-3 flex justify-between items-start bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-0 left-0 w-full p-3 flex justify-between items-start bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10">
              <span className="text-xs font-medium text-white bg-white/10 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
                 {v.loc}
              </span>
@@ -27,7 +38,7 @@ export const VideoGrid: React.FC = () => {
           </div>
 
           {/* 状态指示 - 始终显示 */}
-          <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
              {v.status === 'LIVE' ? (
                 <div className="flex items-center gap-1 bg-red-500/20 backdrop-blur-md border border-red-500/30 px-2 py-0.5 rounded text-[10px] text-red-400 font-bold">
                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div> LIVE
@@ -37,21 +48,6 @@ export const VideoGrid: React.FC = () => {
                    REC
                 </div>
              )}
-          </div>
-
-          {/* 装饰性角标 */}
-          <div className="absolute bottom-3 left-3 opacity-50">
-             <div className="w-2 h-2 border-l border-b border-white/50"></div>
-          </div>
-          <div className="absolute bottom-3 right-3 opacity-50">
-             <div className="w-2 h-2 border-r border-b border-white/50"></div>
-          </div>
-          
-          {/* 中心操作按钮 */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-             <div className="bg-white/10 backdrop-blur-sm p-3 rounded-full border border-white/20 text-white opacity-0 group-hover:opacity-100 transform scale-90 group-hover:scale-100 transition-all duration-300">
-                <Maximize2 size={20} />
-             </div>
           </div>
         </div>
       ))}
