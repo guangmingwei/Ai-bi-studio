@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TechPanel } from '../ui/TechPanel';
-import { MapPin, X, Maximize2, Globe, Crosshair } from 'lucide-react';
+import { X, Maximize2, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const cameraPoints = [
@@ -20,23 +20,21 @@ export const CenterMap: React.FC<CenterMapProps> = ({ activeVideo, onCloseVideo 
   const handleClose = onCloseVideo || (() => setInternalVideo(null));
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-black/20">
-      {/* 3D 旋转地球背景 (CSS 模拟) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-30 pointer-events-none">
-         <div className="w-full h-full border border-cyber-primary/20 rounded-full animate-[spin_20s_linear_infinite]"></div>
-         <div className="absolute top-[10%] left-[10%] w-[80%] h-[80%] border border-cyber-secondary/20 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
-         <div className="absolute top-[20%] left-[20%] w-[60%] h-[60%] border border-white/10 rounded-full animate-[spin_10s_linear_infinite]"></div>
-         {/* 经纬线网格 */}
-         <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,transparent_50%,rgba(0,240,255,0.1)_100%)]"></div>
+    <div className="relative w-full h-full overflow-hidden rounded-xl">
+      {/* 3D 旋转地球背景 (轻科技版) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] opacity-60 pointer-events-none">
+         {/* 外环 */}
+         <div className="w-full h-full border border-slate-500/20 rounded-full animate-[spin_30s_linear_infinite]"></div>
+         {/* 内环 - 虚线 */}
+         <div className="absolute top-[15%] left-[15%] w-[70%] h-[70%] border border-dashed border-blue-400/30 rounded-full animate-[spin_20s_linear_infinite_reverse]"></div>
+         {/* 核心光晕 */}
+         <div className="absolute top-[30%] left-[30%] w-[40%] h-[40%] bg-blue-500/10 blur-3xl rounded-full animate-pulse"></div>
+         {/* 网格纹理 */}
+         <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,transparent_40%,rgba(255,255,255,0.05)_100%)]"></div>
       </div>
 
       {/* 悬浮 UI 层 */}
       <div className="absolute inset-0 z-10">
-        {/* 瞄准准星 */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyber-primary/20">
-           <Crosshair size={400} strokeWidth={0.5} />
-        </div>
-
         {cameraPoints.map((point) => (
           <div 
             key={point.id}
@@ -44,45 +42,49 @@ export const CenterMap: React.FC<CenterMapProps> = ({ activeVideo, onCloseVideo 
             style={{ left: point.x, top: point.y }}
             onClick={() => setInternalVideo(`CAM-${point.id}`)}
           >
-            <div className="relative flex items-center justify-center w-12 h-12">
-               <div className="absolute inset-0 bg-cyber-primary/30 rounded-full animate-ping"></div>
-               <div className="relative z-10 p-2 bg-black border-2 border-cyber-primary rounded-full text-cyber-primary hover:bg-cyber-primary hover:text-black transition-colors shadow-[0_0_20px_#00f0ff]">
-                 <MapPin size={20} />
-               </div>
-               {/* 连接线 */}
-               <div className="absolute top-full left-1/2 w-[1px] h-12 bg-gradient-to-b from-cyber-primary to-transparent"></div>
+            <div className="relative flex items-center justify-center w-8 h-8">
+               {/* 扩散波纹 */}
+               <div className="absolute inset-0 bg-blue-400/30 rounded-full animate-ping"></div>
+               <div className="relative z-10 w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(56,189,248,1)] transition-transform group-hover:scale-125"></div>
+               
+               {/* 垂直引线 */}
+               <div className="absolute bottom-full left-1/2 w-[1px] h-8 bg-gradient-to-t from-blue-400/50 to-transparent"></div>
             </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1 bg-black/80 border border-cyber-primary text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity clip-tech-corner">
+            
+            {/* 悬浮玻璃标签 */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-lg text-xs text-slate-200 whitespace-nowrap opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 shadow-lg">
               {point.label}
             </div>
           </div>
         ))}
       </div>
 
-      {/* 视频弹窗 */}
+      {/* 视频弹窗 (使用新风格 TechPanel) */}
       <AnimatePresence>
         {currentVideo && (
           <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-8"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-8"
           >
-            <TechPanel className="w-full max-w-4xl h-[500px]" title={`正在连接: ${currentVideo}`} variant="alert">
-               <button onClick={handleClose} className="absolute top-4 right-4 text-white hover:text-cyber-accent">
-                 <X size={24} />
-               </button>
-               <div className="flex-1 bg-black relative overflow-hidden border border-white/10">
-                  <div className="absolute inset-0 flex items-center justify-center text-cyber-primary/50">
-                     <Maximize2 size={64} />
+            <TechPanel 
+               className="w-full max-w-3xl h-[480px] shadow-2xl" 
+               title={`正在连接: ${currentVideo}`}
+               rightContent={
+                 <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+                   <X size={18} className="text-white/70" />
+                 </button>
+               }
+            >
+               <div className="flex-1 bg-black/40 relative overflow-hidden rounded-lg border border-white/5 h-full">
+                  <div className="absolute inset-0 flex items-center justify-center text-blue-400/30">
+                     <Maximize2 size={48} />
                   </div>
-                  <div className="absolute bottom-4 left-4 font-mono text-cyber-primary text-sm">
-                     SIGNAL: STRONG <br/>
-                     LAT: 34.0522 N <br/>
-                     LNG: 118.2437 W
+                  <div className="absolute bottom-4 left-4 font-mono text-blue-300/50 text-xs">
+                     SIGNAL: OPTIMAL <br/>
+                     LAT: 34.0522 N | LNG: 118.2437 W
                   </div>
-                  {/* 干扰噪点 */}
-                  <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 animate-pulse"></div>
                </div>
             </TechPanel>
           </motion.div>

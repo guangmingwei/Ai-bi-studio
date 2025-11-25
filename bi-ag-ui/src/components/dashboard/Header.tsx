@@ -1,64 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Wifi, Battery } from 'lucide-react';
+import { Cloud, Radio, Wifi } from 'lucide-react';
+import { useAppStore } from '../../store';
 
 export const Header: React.FC = () => {
   const [time, setTime] = useState(new Date());
+  const { isNavOpen, navPosition } = useAppStore();
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  return (
-    <div className="relative w-full h-24 flex items-start justify-center shrink-0 z-50 px-8 pt-2 pointer-events-none select-none">
-      {/* 顶部装饰线 */}
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-cyber-primary/30"></div>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-[4px] bg-cyber-primary shadow-[0_0_20px_#00f0ff]"></div>
+  // 当菜单在顶部打开时，隐藏右侧时间
+  const showTime = !(isNavOpen && navPosition === 'top');
 
-      {/* 左侧战术数据 */}
-      <div className="absolute left-8 top-6 flex gap-6">
-         <div className="flex flex-col items-end">
-            <span className="text-[10px] text-cyber-primary tracking-widest">CPU LOAD</span>
-            <div className="flex gap-1 mt-1">
-               {[1,2,3,4,5].map(i => (
-                 <div key={i} className="w-1 h-3 bg-cyber-primary/50 animate-pulse" style={{animationDelay: `${i*0.1}s`}}></div>
-               ))}
-            </div>
+  return (
+    <div className="relative w-full h-20 flex items-start justify-center shrink-0 z-50 select-none pointer-events-none">
+      {/* 弧形玻璃背景 */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[70%] h-16 bg-glass rounded-b-[3rem] border-b border-l border-r border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl overflow-hidden">
+         {/* 内部流光 */}
+         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400/50 to-transparent opacity-70"></div>
+         <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-[40%] h-20 bg-blue-500/20 blur-[50px] rounded-full"></div>
+      </div>
+
+      {/* 左侧信息 - 始终显示 */}
+      <div className="absolute top-5 left-8 flex items-center gap-4 pointer-events-auto">
+         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/40 border border-white/5 backdrop-blur text-xs text-slate-300">
+            <Cloud size={14} className="text-sky-400" />
+            <span>24°C</span>
          </div>
-         <div className="flex flex-col items-end">
-            <span className="text-[10px] text-cyber-secondary tracking-widest">NET STATUS</span>
-            <div className="text-xs font-mono text-white flex items-center gap-1">
-               <Wifi size={12} className="text-cyber-secondary" /> SECURE
-            </div>
+         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/40 border border-white/5 backdrop-blur text-xs text-slate-300">
+            <Wifi size={14} className="text-emerald-400" />
+            <span>5ms</span>
          </div>
       </div>
 
-      {/* 中间异形标题 */}
-      <div className="relative bg-cyber-panel/80 backdrop-blur-md px-12 py-3 clip-tech-header border-b-2 border-cyber-primary shadow-[0_0_30px_rgba(0,240,255,0.15)]">
-        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyber-primary tracking-[0.2em] filter drop-shadow-[0_0_10px_rgba(0,240,255,0.8)] text-center">
-          AI综合安防治理<span className="text-white text-2xl align-top ml-2">MONITOR</span>
+      {/* 中间标题 */}
+      <div className="relative z-10 mt-3 text-center">
+        <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-[0.2em] drop-shadow-sm">
+          智慧城市·数字孪生中台
         </h1>
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-4 text-[10px] text-cyber-primary/60 tracking-[0.5em]">
-           <span>SYSTEM ONLINE</span>
-           <span>///</span>
-           <span>AI ACTIVE</span>
+        <div className="flex items-center justify-center gap-2 mt-1 opacity-50">
+           <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-blue-400"></div>
+           <span className="text-[10px] text-blue-200 tracking-[0.5em] uppercase">Smart City Brain</span>
+           <div className="h-[1px] w-8 bg-gradient-to-l from-transparent to-blue-400"></div>
         </div>
       </div>
 
-      {/* 右侧时间与状态 */}
-      <div className="absolute right-8 top-6 flex items-center gap-6">
+      {/* 右侧时间 - 条件显示 */}
+      <div className={`absolute top-4 right-8 flex items-center gap-4 transition-all duration-500 pointer-events-auto ${showTime ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
          <div className="text-right">
-            <div className="text-3xl font-mono font-bold text-white leading-none text-shadow-glow">
+            <div className="text-xl font-mono font-bold text-white tabular-nums tracking-widest">
               {time.toLocaleTimeString('zh-CN', { hour12: false })}
             </div>
-            <div className="text-xs text-cyber-primary tracking-widest mt-1">
-              {time.toLocaleDateString('zh-CN').replace(/\//g, '.')}
+            <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+              {time.toLocaleDateString('zh-CN', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
          </div>
-         <div className="h-8 w-[1px] bg-white/20"></div>
-         <div className="flex flex-col items-center text-cyber-accent">
-            <Battery size={18} />
-            <span className="text-[10px] font-bold">100%</span>
+         <div className="w-10 h-10 rounded-full bg-slate-800/50 border border-white/10 flex items-center justify-center animate-pulse-slow">
+            <Radio size={18} className="text-blue-400" />
          </div>
       </div>
     </div>

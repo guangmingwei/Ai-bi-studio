@@ -1,37 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  /* 赛博朋克/全息指挥舱配色 */
-  --color-cyber-bg: #030014;
-  --color-cyber-panel: rgba(10, 10, 30, 0.6);
-  --color-cyber-primary: #00f0ff;
-  --color-cyber-secondary: #7000ff;
-  --color-cyber-accent: #ff003c;
+  /* 智慧城市/轻科技配色 */
+  --color-tech-bg: #0a1120;
+  --color-tech-panel: rgba(255, 255, 255, 0.03);
+  --color-tech-border: rgba(148, 163, 184, 0.2);
   
-  --color-ui-border: rgba(0, 240, 255, 0.3);
-  --color-ui-glow: rgba(0, 240, 255, 0.5);
-
-  /* 复杂背景 */
-  --background-image-cyber-grid: 
-    linear-gradient(0deg, transparent 24%, rgba(0, 240, 255, .05) 25%, rgba(0, 240, 255, .05) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .05) 75%, rgba(0, 240, 255, .05) 76%, transparent 77%, transparent),
-    linear-gradient(90deg, transparent 24%, rgba(0, 240, 255, .05) 25%, rgba(0, 240, 255, .05) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .05) 75%, rgba(0, 240, 255, .05) 76%, transparent 77%, transparent);
+  --color-tech-primary: #38bdf8;
+  --color-tech-secondary: #818cf8;
+  --color-tech-accent: #f472b6;
+  
+  --color-ui-glass: rgba(15, 23, 42, 0.4);
 
   /* 动画 */
-  --animate-hologram: hologram 3s infinite linear;
-  --animate-border-flow: borderFlow 2s infinite linear;
-  --animate-spin-slow: spin 20s linear infinite;
-  
-  @keyframes hologram {
-    0% { opacity: 0.5; transform: skewX(0deg); }
-    5% { opacity: 0.7; transform: skewX(-2deg); }
-    10% { opacity: 0.6; transform: skewX(1deg); }
-    15% { opacity: 0.8; transform: skewX(0deg); }
-    100% { opacity: 0.5; }
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
   }
 
-  @keyframes borderFlow {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 100% 50%; }
+  @keyframes shimmer {
+    from { transform: translateX(-100%) skewX(-15deg); }
+    to { transform: translateX(200%) skewX(-15deg); }
   }
 }
 
@@ -40,42 +33,22 @@
 }
 
 body {
-  background-color: var(--color-cyber-bg);
-  color: #e0f2fe;
-  font-family: 'Rajdhani', 'Orbitron', system-ui, sans-serif; /* 建议引入 Google Fonts */
+  background-color: var(--color-tech-bg);
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
 }
 
-/* 全局扫描线 */
-.scanlines {
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0),
-    rgba(255,255,255,0) 50%,
-    rgba(0,0,0,0.2) 50%,
-    rgba(0,0,0,0.2)
-  );
-  background-size: 100% 4px;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  z-index: 999;
-  opacity: 0.3;
+.bg-glass {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.4) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-/* 异形切角 */
-.clip-tech-corner {
-  clip-path: polygon(
-    10px 0, 100% 0, 
-    100% calc(100% - 10px), calc(100% - 10px) 100%, 
-    0 100%, 0 10px
-  );
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
-
-.clip-tech-header {
-  clip-path: polygon(
-    0 0, 100% 0, 
-    100% 70%, 95% 100%, 
-    5% 100%, 0 70%
-  );
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.1);
+  border-radius: 4px;
 }

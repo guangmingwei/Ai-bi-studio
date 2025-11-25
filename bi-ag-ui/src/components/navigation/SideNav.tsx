@@ -1,86 +1,110 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldAlert, Cctv, Activity, Megaphone, LayoutDashboard, Settings, ArrowLeftToLine, ArrowUpToLine } from 'lucide-react';
+import { ShieldAlert, Cctv, Activity, Megaphone, Settings, ArrowLeftToLine, ArrowUpToLine, LayoutDashboard } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { twMerge } from 'tailwind-merge';
 
 const menuItems = [
-  { id: 'monitor', label: '监控中心', icon: Cctv, color: 'text-cyber-primary' },
-  { id: 'alert', label: '预警中心', icon: ShieldAlert, color: 'text-cyber-accent' },
-  { id: 'patrol', label: '巡查治理', icon: Activity, color: 'text-cyber-secondary' },
-  { id: 'broadcast', label: '广播喊话', icon: Megaphone, color: 'text-white' },
+  { id: 'monitor', label: '监控中心', icon: Cctv, color: 'text-blue-400' },
+  { id: 'alert', label: '预警中心', icon: ShieldAlert, color: 'text-pink-400' },
+  { id: 'patrol', label: '巡查治理', icon: Activity, color: 'text-amber-400' },
+  { id: 'broadcast', label: '广播喊话', icon: Megaphone, color: 'text-emerald-400' },
 ];
 
 export const SideNav: React.FC = () => {
   const { isNavOpen, navPosition, setNavPosition } = useAppStore();
+  const isLeft = navPosition === 'left';
 
   const variants = {
     left: {
-      open: { x: 0, width: 260, opacity: 1 },
-      closed: { x: -260, width: 0, opacity: 0 },
+      open: { x: 0, opacity: 1 },
+      closed: { x: -100, opacity: 0 },
     },
     top: {
-      open: { y: 0, height: 90, opacity: 1 },
-      closed: { y: -90, height: 0, opacity: 0 },
+      open: { y: 0, opacity: 1 },
+      closed: { y: -50, opacity: 0 },
     }
   };
 
-  const isLeft = navPosition === 'left';
+  if (!isNavOpen) return null;
 
   return (
     <motion.div
-      initial={false}
-      animate={isNavOpen ? 'open' : 'closed'}
+      initial="closed"
+      animate="open"
       variants={isLeft ? variants.left : variants.top}
-      transition={{ type: "spring", stiffness: 200, damping: 25 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className={twMerge(
-        "fixed z-[100] bg-cyber-bg/90 backdrop-blur-xl border-cyber-primary/30 flex shadow-[0_0_50px_rgba(0,0,0,0.8)]",
-        isLeft ? "left-0 top-0 bottom-0 border-r flex-col" : "top-0 left-0 right-0 border-b items-center px-8"
+        "fixed z-[60] backdrop-blur-xl border-white/10 transition-all duration-300",
+        isLeft 
+          ? "left-4 top-24 bottom-4 w-64 rounded-2xl border bg-slate-900/80 shadow-2xl flex flex-col" 
+          : "top-6 right-8 h-12 rounded-full border bg-slate-900/60 flex items-center px-2 shadow-lg"
       )}
     >
-      {/* 装饰背景 */}
-      <div className="absolute inset-0 bg-cyber-grid opacity-10 pointer-events-none"></div>
-
-      {/* Logo Area */}
-      <div className={twMerge("flex items-center gap-3 text-white p-8 relative", !isLeft && "p-0 mr-12")}>
-        <div className="w-10 h-10 bg-cyber-primary text-black flex items-center justify-center rounded clip-tech-corner font-black text-xl">AG</div>
-        <div className="flex flex-col">
-           <span className="font-bold text-lg tracking-widest">CONTROL</span>
-           <span className="text-[10px] text-cyber-primary tracking-[0.3em]">PANEL</span>
+      {/* Logo Area (Only for Left) */}
+      {isLeft && (
+        <div className="p-6 border-b border-white/5">
+          <div className="flex items-center gap-3 text-white">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+               <LayoutDashboard size={18} />
+            </div>
+            <span className="font-bold tracking-wide">控制台</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Menu Items */}
-      <div className={twMerge("flex gap-4", isLeft ? "flex-col px-6 w-full mt-4" : "flex-row items-center flex-1")}>
+      <div className={twMerge("flex gap-2", isLeft ? "flex-col p-4 flex-1 overflow-y-auto" : "flex-row items-center")}>
         {menuItems.map((item) => (
           <button
             key={item.id}
             className={twMerge(
-              "relative flex items-center gap-4 p-4 transition-all group overflow-hidden bg-white/5 border border-white/10 hover:border-cyber-primary/50",
-              "clip-tech-corner hover:bg-cyber-primary/10"
+              "relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all group hover:bg-white/5 border border-transparent hover:border-white/10",
+              !isLeft && "py-1.5 px-3 rounded-full text-sm"
             )}
           >
-            <item.icon size={24} className={`${item.color} drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]`} />
-            <span className="font-bold text-white tracking-wider group-hover:translate-x-1 transition-transform">{item.label}</span>
+            <item.icon size={isLeft ? 20 : 16} className={`${item.color} group-hover:scale-110 transition-transform`} />
+            <span className={twMerge("font-medium text-slate-300 group-hover:text-white", !isLeft && "whitespace-nowrap")}>
+              {item.label}
+            </span>
             
-            {/* Active Bar */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyber-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-bottom"></div>
+            {/* Active Indicator for Left */}
+            {isLeft && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-blue-400 rounded-r group-hover:h-8 transition-all duration-300"></div>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Footer */}
-      <div className={twMerge("p-6 mt-auto w-full flex justify-between border-t border-white/10", !isLeft && "mt-0 border-t-0 border-l ml-auto w-auto pl-8")}>
+      {/* Footer / Toggle (Only for Left, Top has separate toggle) */}
+      {isLeft && (
+        <div className="p-4 border-t border-white/5 flex justify-between items-center bg-black/20 rounded-b-2xl">
+           <button 
+             onClick={() => setNavPosition('top')}
+             className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2 text-xs"
+           >
+             <ArrowUpToLine size={16} />
+             <span>切换至顶部</span>
+           </button>
+           <button className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg">
+             <Settings size={16} />
+           </button>
+        </div>
+      )}
+
+      {/* Config button for Top mode */}
+      {!isLeft && (
+        <div className="w-[1px] h-6 bg-white/10 mx-2"></div>
+      )}
+      {!isLeft && (
          <button 
-           onClick={() => setNavPosition(isLeft ? 'top' : 'left')}
-           className="p-2 text-cyber-primary hover:bg-cyber-primary/20 rounded transition-colors"
+           onClick={() => setNavPosition('left')}
+           className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+           title="切换至侧边"
          >
-           {isLeft ? <ArrowUpToLine size={20} /> : <ArrowLeftToLine size={20} />}
+           <ArrowLeftToLine size={16} />
          </button>
-         <button className="p-2 text-white/50 hover:text-white transition-colors">
-           <Settings size={20} />
-         </button>
-      </div>
+      )}
     </motion.div>
   );
 };

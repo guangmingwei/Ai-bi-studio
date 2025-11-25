@@ -107,15 +107,15 @@ const ModeButton = ({ active, onClick, icon: Icon, label, highlight }: any) => (
   <button 
     onClick={onClick}
     className={`
-      flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all
+      flex items-center gap-2 px-5 py-2 rounded-full border backdrop-blur-md transition-all duration-300
       ${active 
-        ? 'bg-tech-cyan text-tech-bg border-tech-cyan shadow-[0_0_15px_rgba(34,211,238,0.5)]' 
-        : 'bg-tech-bg/50 text-tech-text-dim border-tech-border hover:border-tech-cyan/50 hover:text-tech-cyan'
+        ? 'bg-blue-500/20 text-blue-200 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.4)] scale-105' 
+        : 'bg-slate-900/40 text-slate-400 border-white/10 hover:border-white/30 hover:text-white hover:bg-white/5'
       }
     `}
   >
-    <Icon size={16} className={highlight && active ? 'animate-pulse' : ''} />
-    <span className="text-sm font-medium">{label}</span>
+    <Icon size={16} className={highlight && active ? 'text-pink-400 animate-pulse' : active ? 'text-blue-400' : ''} />
+    <span className="text-sm font-medium tracking-wide">{label}</span>
   </button>
 );
 
