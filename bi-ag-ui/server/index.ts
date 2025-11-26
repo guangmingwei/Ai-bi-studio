@@ -13,6 +13,10 @@ dotenv.config();
 const app = express();
 const port = 4000;
 
+// ==================== 重要:CORS和body parser必须在所有路由之前 ====================
+app.use(cors());
+app.use(express.json());
+
 // 全局音频事件管理器 - 用于实时推送TTS音频
 const audioEventEmitter = new EventEmitter();
 audioEventEmitter.setMaxListeners(100); // 增加监听器限制
@@ -21,14 +25,172 @@ audioEventEmitter.setMaxListeners(100); // 增加监听器限制
 const audioBuffers = new Map<string, Array<{ audio: Buffer; text: string; index: number }>>();
 const sseConnections = new Set<string>(); // 跟踪已连接的SSE客户端
 
+// ==================== 模拟数据统计API ====================
+// 这些API用于AI生成图表时获取数据
+
+// 获取摄像头统计数据
+app.get('/api/stats/cameras', (req, res) => {
+  const { timeRange = '7d' } = req.query;
+  
+  // 模拟数据
+  const mockData = {
+    total: 20,
+    online: 18,
+    offline: 2,
+    trend: {
+      categories: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+      onlineData: [18, 19, 18, 20, 19, 18, 18],
+      offlineData: [2, 1, 2, 0, 1, 2, 2],
+    },
+    distribution: [
+      { name: '正常运行', value: 18 },
+      { name: '离线', value: 2 },
+    ],
+  };
+
+  res.json({ success: true, data: mockData });
+});
+
+// 获取告警统计数据
+app.get('/api/stats/alerts', (req, res) => {
+  const { timeRange = '7d' } = req.query;
+  
+  // 根据时间范围生成不同的数据
+  let categories, dataPoints;
+  
+  switch (timeRange) {
+    case '1d': // 1天 - 按小时
+      categories = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+      dataPoints = 24;
+      break;
+    case '7d': // 7天 - 按天
+      categories = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      dataPoints = 7;
+      break;
+    case '30d': // 30天 - 按周
+      categories = ['第1周', '第2周', '第3周', '第4周'];
+      dataPoints = 4;
+      break;
+    case '90d': // 90天 - 按月
+      categories = ['第1月', '第2月', '第3月'];
+      dataPoints = 3;
+      break;
+    default:
+      categories = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      dataPoints = 7;
+  }
+  
+  // 生成趋势数据
+  const generateTrendData = (base: number, variance: number) => 
+    Array.from({ length: dataPoints }, () => 
+      Math.max(0, Math.floor(base + Math.random() * variance - variance / 2))
+    );
+  
+  const criticalData = generateTrendData(2, 3);
+  const warningData = generateTrendData(7, 5);
+  const infoData = generateTrendData(14, 4);
+  
+  const total = criticalData.reduce((a, b) => a + b, 0) + 
+                warningData.reduce((a, b) => a + b, 0) + 
+                infoData.reduce((a, b) => a + b, 0);
+  
+  const critical = criticalData.reduce((a, b) => a + b, 0);
+  const warning = warningData.reduce((a, b) => a + b, 0);
+  const info = infoData.reduce((a, b) => a + b, 0);
+  
+  // 模拟数据
+  const mockData = {
+    timeRange,
+    total,
+    critical,
+    warning,
+    info,
+    // 添加级别分布数据（用于饼图）
+    levelDistribution: [
+      { name: '严重', value: critical },
+      { name: '警告', value: warning },
+      { name: '信息', value: info },
+    ],
+    // 趋势数据（用于折线图、柱状图）
+    trend: {
+      categories,
+      series: [
+        { name: '严重', data: criticalData, type: 'line' },
+        { name: '警告', data: warningData, type: 'line' },
+        { name: '信息', data: infoData, type: 'line' },
+      ],
+      // 总计数据（用于单一折线图）
+      total: criticalData.map((c, i) => c + warningData[i] + infoData[i]),
+    },
+    // 类型分布数据（用于饼图）
+    typeDistribution: [
+      { name: '入侵检测', value: Math.floor(total * 0.29) },
+      { name: '火灾报警', value: Math.floor(total * 0.15) },
+      { name: '异常行为', value: Math.floor(total * 0.24) },
+      { name: '设备故障', value: Math.floor(total * 0.18) },
+      { name: '其他', value: Math.floor(total * 0.14) },
+    ],
+    // 小时分布数据（用于柱状图）
+    hourlyDistribution: Array.from({ length: 24 }, (_, i) => ({
+      hour: i,
+      count: Math.floor(Math.random() * 15) + 2,
+      label: `${i}:00`,
+    })),
+    // 每日汇总（用于柱状图）
+    dailySummary: categories.map((category, i) => ({
+      category,
+      critical: criticalData[i],
+      warning: warningData[i],
+      info: infoData[i],
+      total: criticalData[i] + warningData[i] + infoData[i],
+    })),
+  };
+
+  console.log(`[API /api/stats/alerts] timeRange=${timeRange}, total=${total}`);
+  res.json({ success: true, data: mockData });
+});
+
+// 获取巡逻统计数据
+app.get('/api/stats/patrol', (req, res) => {
+  const mockData = {
+    totalCameras: 20,
+    activeCameras: 18,
+    averageInterval: 5, // 分钟
+    totalSwitches: 2160, // 过去24小时
+    trend: {
+      categories: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+      data: Array.from({ length: 24 }, () => Math.floor(Math.random() * 100) + 50),
+    },
+  };
+
+  res.json({ success: true, data: mockData });
+});
+
+// 获取系统性能统计
+app.get('/api/stats/system', (req, res) => {
+  const mockData = {
+    cpu: Math.floor(Math.random() * 40) + 30,
+    memory: Math.floor(Math.random() * 30) + 50,
+    disk: Math.floor(Math.random() * 20) + 60,
+    network: {
+      upload: Math.floor(Math.random() * 100) + 50,
+      download: Math.floor(Math.random() * 200) + 100,
+    },
+    trend: {
+      categories: Array.from({ length: 12 }, (_, i) => `${i * 5}分钟前`).reverse(),
+      cpu: Array.from({ length: 12 }, () => Math.floor(Math.random() * 40) + 30),
+      memory: Array.from({ length: 12 }, () => Math.floor(Math.random() * 30) + 50),
+    },
+  };
+
+  res.json({ success: true, data: mockData });
+});
+
 // Configure multer for file uploads (voice recording)
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
-
-app.use(cors());
-app.use(express.json());
 
 // SiliconFlow Configuration
 // Using Kimi model which supports reasoning and tools better
@@ -76,7 +238,75 @@ const SYSTEM_PROMPT = `你是成都智友辰科技有限公司于2025年发布�
 - 切换模式：监控墙(video-grid)、地图(map)、AI助手(ai-chat)
 - 紧急模式：启动/关闭应急响应
 - 巡逻配置：自动切换摄像头
-- 侧边栏控制`;
+- 侧边栏控制
+- **数据分析与可视化（新功能）**：当用户需要统计分析、查看趋势图表时，使用 generateChart 工具
+
+**数据分析与图表生成指引**：
+当用户提出以下类型的请求时，使用 generateChart 工具生成可视化图表：
+1. **统计请求**："统计最近一周的告警数量"、"摄像头在线率分析"、"告警类型分布"
+2. **趋势分析**："显示告警趋势图"、"摄像头状态变化趋势"、"系统性能走势"
+3. **数据对比**："对比不同时间段的数据"、"各类告警数量对比"
+4. **分布展示**："告警类型占比"、"摄像头在线离线分布"
+
+**时间范围选择**：
+- "今天"、"最近24小时" → timeRange: "1d"
+- "本周"、"最近7天"、"一周" → timeRange: "7d" (默认)
+- "本月"、"最近30天"、"一个月" → timeRange: "30d"
+- "最近三个月"、"季度" → timeRange: "90d"
+
+**图表类型选择**：
+- **折线图 (line)**：适合趋势分析、时间序列数据、变化趋势
+  - 示例："显示最近一周告警趋势"
+- **柱状图 (bar)**：适合数量对比、类别对比、排名展示
+  - 示例："对比不同级别的告警数量"
+- **饼图 (pie)**：适合占比分布、百分比展示、构成分析
+  - 示例："告警类型分布占比"、"级别分布"
+- **散点图 (scatter)**：适合相关性分析、数据分布
+- **雷达图 (radar)**：适合多维度评估、综合指标
+
+可用数据源：
+- /api/stats/cameras - 摄像头统计（总数、在线/离线、趋势、分布）
+- /api/stats/alerts - 告警统计（总数、级别分布、时间趋势、类型分布）
+- /api/stats/patrol - 巡逻统计（巡逻次数、间隔、趋势）
+- /api/stats/system - 系统性能（CPU、内存、磁盘、网络）
+
+调用示例：
+1. 折线图 - 趋势分析：
+generateChart({
+  dataSource: "/api/stats/alerts",
+  chartType: "line",
+  title: "最近7天告警趋势",
+  description: "展示每日告警数量变化趋势",
+  timeRange: "7d",
+  dataMapping: {
+    xAxis: "trend.categories",
+    series: "trend.series"
+  }
+})
+
+2. 饼图 - 占比分布：
+generateChart({
+  dataSource: "/api/stats/alerts",
+  chartType: "pie",
+  title: "告警级别分布",
+  description: "展示不同级别告警的占比",
+  dataMapping: {
+    data: "levelDistribution"
+  }
+})
+
+3. 柱状图 - 对比分析：
+generateChart({
+  dataSource: "/api/stats/alerts",
+  chartType: "bar",
+  title: "每日告警统计",
+  description: "对比每天的告警数量",
+  timeRange: "7d",
+  dataMapping: {
+    xAxis: "trend.categories",
+    series: "trend.series"
+  }
+})`;
 
 
 class SiliconFlowAdapter extends OpenAIAdapter {
@@ -94,49 +324,49 @@ class SiliconFlowAdapter extends OpenAIAdapter {
         // 1. Improved Message Role Mapping - Keep more history for proper context
         const openAIMessages = messages
             .map((msg: any, index: number) => {
-                let role = 'user'; // Default fallback
-                let content = msg.content;
+             let role = 'user'; // Default fallback
+             let content = msg.content;
 
                 // More precise role mapping
-                if (msg.role === 'system') {
-                    role = 'system';
-                } else if (msg.role === 'assistant') {
-                    role = 'assistant';
-                } else if (msg.role === 'user') {
-                    role = 'user';
-                } else if (msg.type === 'TextMessage') {
+             if (msg.role === 'system') {
+                 role = 'system';
+             } else if (msg.role === 'assistant') {
+                 role = 'assistant';
+             } else if (msg.role === 'user') {
+                 role = 'user';
+             } else if (msg.type === 'TextMessage') {
                     // TextMessage can be from user or assistant
                     role = msg.role === 'assistant' ? 'assistant' : 'user';
-                } else if (msg.type === 'ActionExecutionMessage') {
+             } else if (msg.type === 'ActionExecutionMessage') {
                     // Action execution is from assistant, but we'll skip it
                     // to avoid tool call complexity
                     console.log(`[SiliconFlowAdapter] Skipping ActionExecutionMessage at index ${index}`);
                     return null;
-                } else if (msg.type === 'ResultMessage') {
+             } else if (msg.type === 'ResultMessage') {
                     // Result messages need tool_call_id, so we skip them
                     console.log(`[SiliconFlowAdapter] Skipping ResultMessage at index ${index}`);
                     return null;
-                }
+             }
 
                 // Validate role
                 const validRoles = ['system', 'assistant', 'user'];
-                if (!validRoles.includes(role)) {
+             if (!validRoles.includes(role)) {
                     console.warn(`[SiliconFlowAdapter] Invalid role: ${role} at index ${index}, falling back to user`);
-                    role = 'user';
-                }
-                
-                // Ensure content is string
-                if (typeof content !== 'string') {
-                    content = JSON.stringify(content || "");
-                }
+                 role = 'user';
+             }
+             
+             // Ensure content is string
+             if (typeof content !== 'string') {
+                 content = JSON.stringify(content || "");
+             }
                 
                 // Skip empty messages
                 if (!content || content.trim() === '' || content === '{}' || content === 'null') {
                     console.log(`[SiliconFlowAdapter] Skipping empty message at index ${index}`);
                     return null;
-                }
+             }
 
-                return { role, content };
+             return { role, content };
             })
             .filter((msg: any) => msg !== null); // Remove null entries
 
@@ -200,6 +430,40 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                         description: "Time interval between camera switches in minutes"
                     }
                 }
+            },
+            generateChart: {
+                type: "object",
+                properties: {
+                    dataSource: {
+                        type: "string",
+                        description: "Data source API endpoint. Options: /api/stats/cameras, /api/stats/alerts, /api/stats/patrol, /api/stats/system",
+                        enum: ["/api/stats/cameras", "/api/stats/alerts", "/api/stats/patrol", "/api/stats/system"]
+                    },
+                    chartType: {
+                        type: "string",
+                        description: "Type of chart to generate. Options: line (折线图-趋势), bar (柱状图-对比), pie (饼图-占比), scatter (散点图), radar (雷达图)",
+                        enum: ["line", "bar", "pie", "scatter", "radar"]
+                    },
+                    title: {
+                        type: "string",
+                        description: "Chart title in Chinese"
+                    },
+                    description: {
+                        type: "string",
+                        description: "Brief description of what the chart shows"
+                    },
+                    timeRange: {
+                        type: "string",
+                        description: "Time range for data analysis. Options: 1d (最近1天/24小时), 7d (最近7天/一周), 30d (最近30天/一月), 90d (最近90天/三月). Default: 7d",
+                        enum: ["1d", "7d", "30d", "90d"]
+                    },
+                    dataMapping: {
+                        type: "object",
+                        description: "Instructions on how to map the fetched data to chart configuration. E.g., which fields to use for xAxis, yAxis, series, etc.",
+                        additionalProperties: true
+                    }
+                },
+                required: ["dataSource", "chartType", "title"]
             }
         };
 
@@ -215,12 +479,12 @@ class SiliconFlowAdapter extends OpenAIAdapter {
             console.log(`[SiliconFlowAdapter] Using schema for ${action.name}:`, JSON.stringify(parametersSchema, null, 2));
             
             return {
-                type: "function",
-                function: {
-                    name: action.name,
-                    description: action.description,
+            type: "function",
+            function: {
+                name: action.name,
+                description: action.description,
                     parameters: parametersSchema,
-                }
+            }
             };
         }) : undefined;
 
@@ -321,7 +585,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                 const payload = {
                     model: "MiniMaxAI/MiniMax-M2",
                     messages: openAIMessages,
-                    tools: tools, 
+                    tools: tools,
                     stream: true,
                     stream_options: { include_usage: true }
                 };
@@ -392,11 +656,14 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                                 const toolName = toolCall.function?.name || "";
                                 toolCallMap.set(index, id);
                                 
+                                console.log(`[Tool Call] Starting: ${toolName} (id: ${id}, index: ${index})`);
+                                
                                 // Track tool name for intelligent fallback
                                 if (toolName && !calledToolNames.includes(toolName)) {
                                     calledToolNames.push(toolName);
                                 }
                                 
+                                console.log(`[Tool Call] Sending ActionExecutionStart to frontend...`);
                                 eventStream$.sendActionExecutionStart({
                                     actionExecutionId: id,
                                     actionName: toolName,
@@ -406,6 +673,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
 
                             const args = toolCall.function?.arguments;
                             if (args && toolCallMap.has(index)) {
+                                console.log(`[Tool Call] Sending arguments for tool ${toolCallMap.get(index)}: ${args.substring(0, 100)}...`);
                                 eventStream$.sendActionExecutionArgs({
                                     actionExecutionId: toolCallMap.get(index)!,
                                     args: args
@@ -441,7 +709,8 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                             'setDashboardMode': '视图模式已切换',
                             'setEmergencyMode': '紧急模式状态已更新',
                             'configurePatrol': '巡逻配置已调整',
-                            'toggleSidebar': '侧边栏显示已切换'
+                            'toggleSidebar': '侧边栏显示已切换',
+                            'generateChart': '图表生成中'
                         };
                         
                         const firstTool = calledToolNames[0];
@@ -490,9 +759,9 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                 if (err.status === 429) {
                      const msg = "SiliconFlow rate limit exceeded. Please try again later.";
                      if (!startedTextMessage) { 
-                         eventStream$.sendTextMessageStart({ messageId: "error" });
-                         eventStream$.sendTextMessageContent({ messageId: "error", content: msg });
-                         eventStream$.sendTextMessageEnd({ messageId: "error" });
+                     eventStream$.sendTextMessageStart({ messageId: "error" });
+                     eventStream$.sendTextMessageContent({ messageId: "error", content: msg });
+                     eventStream$.sendTextMessageEnd({ messageId: "error" });
                      } else {
                          eventStream$.sendTextMessageContent({ messageId: messageId || "error", content: `\n\n[Error: ${msg}]` });
                          if (messageId) eventStream$.sendTextMessageEnd({ messageId });

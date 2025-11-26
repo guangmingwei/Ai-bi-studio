@@ -7,6 +7,9 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
+import { useAppActions } from '../hooks/useAppActions';
+import { useAppStore } from '../../store';
+import ChartModal from './ChartModal';
 
 export const CustomChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +17,12 @@ export const CustomChatWidget = () => {
   
   // 使用 CopilotKit 的核心 Chat Hook
   const { visibleMessages, appendMessage, isLoading } = useCopilotChat();
+  
+  // 注册 AI Actions (这会在全局store中设置状态)
+  useAppActions();
+  
+  // 从全局store获取图表状态
+  const { chartConfig, isChartModalOpen, setIsChartModalOpen } = useAppStore();
 
   const [inputValue, setInputValue] = useState('');
 
@@ -479,6 +488,16 @@ export const CustomChatWidget = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Chart Modal */}
+      {chartConfig && (
+        <ChartModal
+          isOpen={isChartModalOpen}
+          onClose={() => setIsChartModalOpen(false)}
+          config={chartConfig}
+          title={chartConfig.title}
+        />
+      )}
     </>
   );
 };

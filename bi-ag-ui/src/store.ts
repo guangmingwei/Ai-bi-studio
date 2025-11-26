@@ -22,6 +22,16 @@ export interface PatrolConfig {
   gridSize: 4 | 9;
 }
 
+// 图表配置接口
+export interface ChartConfig {
+  type: 'chart' | 'table' | 'custom';
+  chartType?: 'line' | 'bar' | 'pie' | 'scatter' | 'radar';
+  title?: string;
+  description?: string;
+  data: Record<string, unknown>;
+  options?: Record<string, unknown>;
+}
+
 interface AppState {
   // 页面导航状态
   currentView: PageView;
@@ -51,6 +61,12 @@ interface AppState {
   // 监控轮巡配置
   patrolConfig: PatrolConfig;
   setPatrolConfig: (config: Partial<PatrolConfig>) => void;
+  
+  // 图表模态框状态
+  chartConfig: ChartConfig | null;
+  isChartModalOpen: boolean;
+  setChartConfig: (config: ChartConfig | null) => void;
+  setIsChartModalOpen: (isOpen: boolean) => void;
   
   // 引导层状态
   hasSeenGuide: boolean;
@@ -90,6 +106,18 @@ export const useAppStore = create<AppState>()(
         patrolConfig: { ...state.patrolConfig, ...config }
       })),
       
+      // 图表模态框状态
+      chartConfig: null,
+      isChartModalOpen: false,
+      setChartConfig: (config) => {
+        console.log('[Store] Setting chartConfig:', config);
+        set({ chartConfig: config });
+      },
+      setIsChartModalOpen: (isOpen) => {
+        console.log('[Store] Setting isChartModalOpen:', isOpen);
+        set({ isChartModalOpen: isOpen });
+      },
+      
       hasSeenGuide: false,
       setHasSeenGuide: (hasSeen) => set({ hasSeenGuide: hasSeen }),
     }),
@@ -103,7 +131,8 @@ export const useAppStore = create<AppState>()(
         centerMode: state.centerMode,
         patrolConfig: state.patrolConfig,
         hasSeenGuide: state.hasSeenGuide,
+        // chartConfig 不持久化,每次刷新都清空
       }),
     }
-  )
+  ) as any // Zustand persist 类型兼容性
 );

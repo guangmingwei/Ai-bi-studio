@@ -7,6 +7,9 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
+import { useAppActions } from '../hooks/useAppActions';
+import { useAppStore } from '../../store';
+import ChartModal from './ChartModal';
 
 /**
  * ChatPanel - 嵌入式AI聊天面板组件
@@ -17,6 +20,21 @@ export const ChatPanel: React.FC = () => {
   
   // 使用 CopilotKit 的核心 Chat Hook
   const { visibleMessages, appendMessage, isLoading } = useCopilotChat();
+  
+  // 注册 AI Actions (这会在全局store中设置状态)
+  useAppActions();
+  
+  // 从全局store获取图表状态
+  const { chartConfig, isChartModalOpen, setIsChartModalOpen } = useAppStore();
+
+  // Debug: 监控图表状态变化
+  useEffect(() => {
+    console.log('[ChatPanel] Chart state changed from store:', {
+      chartConfig,
+      isChartModalOpen,
+      hasConfig: !!chartConfig
+    });
+  }, [chartConfig, isChartModalOpen]);
 
   const [inputValue, setInputValue] = useState('');
   
@@ -478,6 +496,16 @@ export const ChatPanel: React.FC = () => {
           </button>
         </div>
       </div>
+      
+      {/* Chart Modal */}
+      {chartConfig && (
+        <ChartModal
+          isOpen={isChartModalOpen}
+          onClose={() => setIsChartModalOpen(false)}
+          config={chartConfig}
+          title={chartConfig.title}
+        />
+      )}
     </div>
   );
 };
