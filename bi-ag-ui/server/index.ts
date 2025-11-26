@@ -32,8 +32,15 @@ const openai = new OpenAI({
 
 const copilotRuntime = new CopilotRuntime();
 
-const SYSTEM_PROMPT = `你是一个AI综合安防风险治理平台的智能助手。
+const SYSTEM_PROMPT = `你是成都智友辰科技有限公司于2025年发布的AI综合安防风险治理平台助手。
 你的职责是协助用户管理安防系统、监控视频流、处理警报和执行巡逻任务。
+
+**关于你的身份信息**（当用户询问时务必准确回答）：
+- **开发公司**：成都智友辰科技有限公司
+- **产品名称**：AI综合安防风险治理平台助手
+- **发布时间**：2025年
+- **你的角色**：智能安防助手，专注于综合安防风险治理
+- 当用户问"你是谁"、"你是什么系统"、"谁开发的你"、"你的作者是谁"、"系统版本"等类似问题时，回答："我是成都智友辰科技有限公司于2025年发布的AI综合安防风险治理平台助手，专注于协助您管理安防系统的各项功能。"
 
 请严格遵守以下要求：
 1. **语言要求**：所有回复必须严格使用**中文**。
@@ -46,6 +53,14 @@ const SYSTEM_PROMPT = `你是一个AI综合安防风险治理平台的智能助�
 - 例如：调用 navigateToPage({page: "monitor"}) 后，必须回复 "已切换到监控中心"
 - 例如：调用 toggleSidebar() 后，必须回复 "已切换侧边栏显示状态"
 - **永远不要只调用工具而不返回任何文字**，这会导致系统错误
+
+**重要规则 - 语音友好的回复格式**：
+- **禁止使用Markdown格式符号**（如 -、*、#、> 等）
+- **使用自然流畅的口语化表达**，适合语音朗读
+- 列举内容时用"第一、第二"或"首先、其次、最后"，而不是用短横线
+- 不要使用列表、代码块、引用等格式
+- 例如：不要说"我可以帮助您：- 监控视频 - 处理警报"
+- 而应该说"我可以帮助您监控视频、处理警报、配置巡逻等任务"
 
 可用功能：
 - 导航页面：综合态势(dashboard)、监控中心(monitor)、预警中心(alert)、巡查治理(patrol)、广播喊话(broadcast)
@@ -205,6 +220,8 @@ class SiliconFlowAdapter extends OpenAIAdapter {
             let startedTextMessage = false;
             let messageId: string | undefined;
             const toolCallMap = new Map<number, string>(); // index -> id
+            const calledToolNames: string[] = []; // Track which tools were called
+            const fullMessageBuffer: string[] = []; // 累积完整消息内容
 
             try {
                 console.log("[SiliconFlowAdapter] Requesting streaming completion from SiliconFlow (MiniMax-M2)...");
@@ -225,7 +242,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     console.log("  - Tool names:", tools.map((t: any) => t.function.name).join(", "));
                 }
 
-                const stream = await openai.chat.completions.create(payload as any);
+                const stream = await openai.chat.completions.create(payload as any) as unknown as AsyncIterable<any>;
                 
                 for await (const chunk of stream) {
                     if (!chunk.choices || chunk.choices.length === 0) {
@@ -239,6 +256,9 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     const content = delta.content || "";
                     
                     if (content) {
+                        // 累积内容到缓冲区
+                        fullMessageBuffer.push(content);
+                        
                         if (!startedTextMessage) {
                             messageId = chunk.id || `msg_${Date.now()}`; 
                             eventStream$.sendTextMessageStart({ messageId });
@@ -259,11 +279,17 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                             if (toolCall.id) {
                                 // New tool call start
                                 const id = toolCall.id;
+                                const toolName = toolCall.function?.name || "";
                                 toolCallMap.set(index, id);
+                                
+                                // Track tool name for intelligent fallback
+                                if (toolName && !calledToolNames.includes(toolName)) {
+                                    calledToolNames.push(toolName);
+                                }
                                 
                                 eventStream$.sendActionExecutionStart({
                                     actionExecutionId: id,
-                                    actionName: toolCall.function?.name || "",
+                                    actionName: toolName,
                                     parentMessageId: chunk.id || messageId || `msg_${Date.now()}`
                                 });
                             }
@@ -279,17 +305,41 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     }
                 }
                 
-                // CRITICAL FIX: If only tool calls were made without any text content,
-                // send a placeholder message to prevent CopilotKit from auto-retrying
+                // Generate intelligent fallback response based on tool calls
+                // This ensures CopilotKit doesn't auto-retry while providing meaningful feedback
                 if (toolCallMap.size > 0 && !startedTextMessage) {
+                    console.log("[SiliconFlowAdapter] Model called tools without text response, generating intelligent fallback");
+                    
+                    // Generate contextual response based on the tools that were called
+                    let fallbackMessage = "操作已执行";
+                    
+                    if (calledToolNames.length > 0) {
+                        // Map tool names to user-friendly Chinese messages
+                        const actionMap: Record<string, string> = {
+                            'navigateToPage': '页面切换成功',
+                            'setDashboardMode': '视图模式已切换',
+                            'setEmergencyMode': '紧急模式状态已更新',
+                            'configurePatrol': '巡逻配置已调整',
+                            'toggleSidebar': '侧边栏显示已切换'
+                        };
+                        
+                        const firstTool = calledToolNames[0];
+                        fallbackMessage = actionMap[firstTool] || '操作已完成';
+                        
+                        // If multiple tools were called, indicate that
+                        if (calledToolNames.length > 1) {
+                            fallbackMessage += `，共执行了${calledToolNames.length}个操作`;
+                        }
+                    }
+                    
                     messageId = `msg_${Date.now()}`;
                     eventStream$.sendTextMessageStart({ messageId });
                     eventStream$.sendTextMessageContent({
                         messageId,
-                        content: "✓" // Minimal acknowledgment
+                        content: fallbackMessage
                     });
                     eventStream$.sendTextMessageEnd({ messageId });
-                    console.log("[SiliconFlowAdapter] Added placeholder message for tool-only response");
+                    console.log(`[SiliconFlowAdapter] Sent intelligent fallback: "${fallbackMessage}" for tools: [${calledToolNames.join(', ')}]`);
                 }
                 
                 // End text message if started
@@ -301,6 +351,13 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                 for (const id of toolCallMap.values()) {
                     eventStream$.sendActionExecutionEnd({ actionExecutionId: id });
                 }
+                
+                // 打印完整的AI回复内容
+                const fullMessage = fullMessageBuffer.join('');
+                console.log("[SiliconFlowAdapter] ===== AI Complete Response =====");
+                console.log(`[SiliconFlowAdapter] Total length: ${fullMessage.length} chars`);
+                console.log(`[SiliconFlowAdapter] Content: "${fullMessage}"`);
+                console.log("[SiliconFlowAdapter] ================================");
                 
                 console.log("[SiliconFlowAdapter] Stream completed successfully.");
                 eventStream$.complete();

@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useCopilotChat } from "@copilotkit/react-core";
 import { Role, TextMessage } from "@copilotkit/runtime-client-gql";
 import { Send, X, User, Bot, Sparkles, Mic, MicOff, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
-import { speechToText, textToSpeechStream } from '../services/voiceService';
+import { speechToText, textToSpeechStream, cleanTextForTTS } from '../services/voiceService';
 
 export const CustomChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,7 +23,12 @@ export const CustomChatWidget = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [autoPlayVoice, setAutoPlayVoice] = useState(true);
-  const lastAssistantMessageRef = useRef<string>('');
+  const ttsQueueRef = useRef<string[]>([]); // TTS队列
+  const isPlayingTTSRef = useRef<boolean>(false); // 是否正在播放TTS
+  const currentMessageBufferRef = useRef<string>(''); // 当前消息的缓冲区
+  const lastSentLengthRef = useRef<number>(0); // 上次发送TTS的长度
+  const lastMessageIdRef = useRef<string>(''); // 用于检测新消息
+  const audioPreloadRef = useRef<HTMLAudioElement | null>(null); // 预加载的下一个音频
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
@@ -67,22 +74,91 @@ export const CustomChatWidget = () => {
     }
   };
 
-  // 播放AI回复的语音
-  const playAssistantVoice = React.useCallback(async (text: string) => {
-    if (!text || isSpeaking) return;
+  // 播放TTS队列中的下一个片段（带预加载优化）
+  const playNextTTSChunk = useCallback(async () => {
+    if (isPlayingTTSRef.current || ttsQueueRef.current.length === 0) {
+      return;
+    }
 
+    isPlayingTTSRef.current = true;
     setIsSpeaking(true);
-    setVoiceError(null);
+
+    const chunk = ttsQueueRef.current.shift();
+    if (!chunk) {
+      isPlayingTTSRef.current = false;
+      setIsSpeaking(false);
+      return;
+    }
 
     try {
-      await textToSpeechStream(text);
-    } catch (error: unknown) {
-      const err = error as Error;
-      setVoiceError(err.message || '语音播放失败');
-    } finally {
+      console.log(`[CustomChatWidget] Playing TTS chunk: "${chunk.substring(0, 30)}..." (${chunk.length} chars)`);
+      
+      // 如果有预加载的音频，直接使用
+      if (audioPreloadRef.current) {
+        const preloadedAudio = audioPreloadRef.current;
+        audioPreloadRef.current = null;
+        
+        await new Promise<void>((resolve, reject) => {
+          preloadedAudio.onended = () => resolve();
+          preloadedAudio.onerror = () => reject(new Error('音频播放失败'));
+          preloadedAudio.play().catch(reject);
+        });
+      } else {
+        // 没有预加载，正常请求
+        await textToSpeechStream(chunk);
+      }
+      
+      // 如果队列中还有下一个，提前开始加载（预加载）
+      if (ttsQueueRef.current.length > 0) {
+        const nextChunk = ttsQueueRef.current[0];
+        const cleanedNextChunk = cleanTextForTTS(nextChunk);
+        console.log(`[CustomChatWidget] Preloading next chunk: "${nextChunk.substring(0, 20)}..."`);
+        
+        // 异步预加载下一个音频
+        fetch(`${window.location.origin}/api/text-to-speech`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: cleanedNextChunk })
+        })
+        .then(res => res.blob())
+        .then(blob => {
+          const audio = new Audio(URL.createObjectURL(blob));
+          audio.preload = 'auto';
+          audioPreloadRef.current = audio;
+          console.log('[CustomChatWidget] Next chunk preloaded successfully');
+        })
+        .catch(err => {
+          console.warn('[CustomChatWidget] Preload failed:', err);
+        });
+      }
+      
+    } catch (error) {
+      console.error('[CustomChatWidget] TTS chunk error:', error);
+    }
+
+    isPlayingTTSRef.current = false;
+
+    // 继续播放队列中的下一个
+    if (ttsQueueRef.current.length > 0) {
+      // 短暂延迟，让预加载有时间完成
+      setTimeout(() => playNextTTSChunk(), 50);
+    } else {
       setIsSpeaking(false);
     }
-  }, [isSpeaking]);
+  }, []);
+
+  // 将文本片段加入TTS队列
+  const enqueueTTSChunk = useCallback((text: string) => {
+    if (!text || text.trim().length === 0) return;
+    
+    console.log(`[CustomChatWidget] Enqueuing TTS chunk: "${text}"`);
+    ttsQueueRef.current.push(text);
+    
+    // 如果当前没有在播放，立即开始
+    if (!isPlayingTTSRef.current) {
+      playNextTTSChunk();
+    }
+  }, [playNextTTSChunk]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -144,26 +220,124 @@ export const CustomChatWidget = () => {
     return filtered;
   }, [visibleMessages, processMessageContent]);
 
-  // 自动播放最新的AI回复
+  // 流式增量TTS - 监听消息内容变化，每积累一定字符就发送TTS
   useEffect(() => {
-    if (!autoPlayVoice || isLoading || displayMessages.length === 0 || !isOpen) return;
+    if (!autoPlayVoice || displayMessages.length === 0 || !isOpen) return;
 
     const lastMessage = displayMessages[displayMessages.length - 1] as unknown as Record<string, unknown>;
     const isAssistant = lastMessage.role !== Role.User && lastMessage.role !== 'user';
 
-    if (isAssistant) {
-      const content = lastMessage.content 
-        ? (typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content))
-        : '';
-      
-      const processedContent = processMessageContent(content);
+    if (!isAssistant) {
+      // 如果不是AI消息，重置状态
+      currentMessageBufferRef.current = '';
+      lastSentLengthRef.current = 0;
+      lastMessageIdRef.current = '';
+      return;
+    }
 
-      if (processedContent && processedContent !== lastAssistantMessageRef.current) {
-        lastAssistantMessageRef.current = processedContent;
-        playAssistantVoice(processedContent);
+    const messageId = (lastMessage.id as string) || '';
+    const content = lastMessage.content 
+      ? (typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content))
+      : '';
+    
+    const processedContent = processMessageContent(content);
+
+    // 检测是否是新消息
+    if (messageId && messageId !== lastMessageIdRef.current) {
+      console.log('[CustomChatWidget] ===== New AI Message Detected =====');
+      console.log(`[CustomChatWidget] Message ID: ${messageId}`);
+      console.log('[CustomChatWidget] Resetting TTS buffer');
+      currentMessageBufferRef.current = '';
+      lastSentLengthRef.current = 0;
+      lastMessageIdRef.current = messageId;
+      // 清空队列（新消息开始）
+      ttsQueueRef.current = [];
+      // 清理预加载的音频
+      if (audioPreloadRef.current) {
+        audioPreloadRef.current.pause();
+        audioPreloadRef.current = null;
+      }
+      if (!isPlayingTTSRef.current) {
+        setIsSpeaking(false);
       }
     }
-  }, [displayMessages, isLoading, autoPlayVoice, isOpen, playAssistantVoice, processMessageContent]);
+
+    // 更新缓冲区
+    currentMessageBufferRef.current = processedContent;
+
+    // 打印当前接收到的内容状态
+    console.log(`[CustomChatWidget] Current content length: ${processedContent.length}, lastSent: ${lastSentLengthRef.current}, isLoading: ${isLoading}`);
+    if (processedContent.length > 0) {
+      console.log(`[CustomChatWidget] Current full content: "${processedContent}"`);
+    }
+
+    // 检查是否有新内容
+    const newContentLength = processedContent.length;
+    if (newContentLength <= lastSentLengthRef.current) {
+      // 没有新内容，直接返回
+      return;
+    }
+
+    // 提取所有未发送的新内容
+    const unsentContent = processedContent.substring(lastSentLengthRef.current);
+    const TTS_CHUNK_SIZE = 30; // 最小chunk大小
+
+    // 查找所有可能的断句点
+    const punctuationRegex = /[。，！？、；：]/g;
+    let match;
+    let lastGoodBreakPoint = -1;
+
+    // 找到最后一个超过最小chunk大小的断句点
+    while ((match = punctuationRegex.exec(unsentContent)) !== null) {
+      if (match.index >= TTS_CHUNK_SIZE * 0.6) {
+        lastGoodBreakPoint = match.index;
+      }
+    }
+
+    let shouldSend = false;
+    let chunkToSend = '';
+
+    if (lastGoodBreakPoint >= 0) {
+      // 找到了合适的断句点
+      chunkToSend = unsentContent.substring(0, lastGoodBreakPoint + 1);
+      shouldSend = true;
+      console.log(`[CustomChatWidget] Found punctuation at ${lastGoodBreakPoint}, sending ${chunkToSend.length} chars`);
+    } else if (unsentContent.length >= TTS_CHUNK_SIZE * 1.5 && !isLoading) {
+      // 没找到断句点，但内容很长且消息已完成，强制发送
+      chunkToSend = unsentContent;
+      shouldSend = true;
+      console.log(`[CustomChatWidget] No punctuation found, message complete, sending all ${chunkToSend.length} chars`);
+    } else if (unsentContent.length >= TTS_CHUNK_SIZE * 2) {
+      // 内容非常长，强制切分避免等待太久
+      chunkToSend = unsentContent.substring(0, TTS_CHUNK_SIZE * 1.5);
+      shouldSend = true;
+      console.log(`[CustomChatWidget] Content too long (${unsentContent.length}), force sending ${chunkToSend.length} chars`);
+    }
+
+    if (shouldSend && chunkToSend.trim().length > 0) {
+      console.log(`[CustomChatWidget] Enqueuing TTS chunk: "${chunkToSend.substring(0, 30)}..." (${chunkToSend.length} chars)`);
+      enqueueTTSChunk(chunkToSend);
+      lastSentLengthRef.current += chunkToSend.length;
+    }
+
+    // 如果消息加载完成，发送所有剩余内容
+    if (!isLoading) {
+      const finalRemaining = processedContent.substring(lastSentLengthRef.current);
+      if (finalRemaining.trim().length > 0) {
+        console.log(`[CustomChatWidget] ===== Message Loading Complete =====`);
+        console.log(`[CustomChatWidget] Full message length: ${processedContent.length}`);
+        console.log(`[CustomChatWidget] Already sent: ${lastSentLengthRef.current}`);
+        console.log(`[CustomChatWidget] Remaining to send: ${finalRemaining.length} chars`);
+        console.log(`[CustomChatWidget] Final content: "${finalRemaining}"`);
+        enqueueTTSChunk(finalRemaining);
+        lastSentLengthRef.current = newContentLength;
+        console.log(`[CustomChatWidget] ===================================`);
+      } else {
+        console.log(`[CustomChatWidget] Message complete, all content already sent (${processedContent.length} chars total)`);
+      }
+    }
+
+  }, [displayMessages, isLoading, autoPlayVoice, isOpen, processMessageContent, enqueueTTSChunk]);
 
   return (
     <>
@@ -244,7 +418,37 @@ export const CustomChatWidget = () => {
                         : 'bg-slate-800/50 border-white/10 text-slate-200 rounded-tl-none'
                       }
                     `}>
-                      {displayContent}
+                      {isUser ? (
+                        displayContent
+                      ) : (
+                        <div className="prose prose-invert prose-sm max-w-none">
+                          <ReactMarkdown
+                            rehypePlugins={[rehypeRaw]}
+                            components={{
+                              // 自定义样式以适配科技风格
+                              p: ({...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                              ul: ({...props}) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
+                              ol: ({...props}) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
+                              li: ({...props}) => <li className="text-slate-200" {...props} />,
+                              strong: ({...props}) => <strong className="font-semibold text-tech-cyan" {...props} />,
+                              em: ({...props}) => <em className="italic text-slate-300" {...props} />,
+                              // @ts-expect-error - ReactMarkdown component type
+                              code: ({inline, ...props}) => 
+                                inline ? (
+                                  <code className="px-1.5 py-0.5 bg-slate-700/50 rounded text-xs text-tech-cyan font-mono" {...props} />
+                                ) : (
+                                  <code className="block p-2 bg-slate-900/50 rounded text-xs text-slate-300 font-mono overflow-x-auto" {...props} />
+                                ),
+                              a: ({...props}) => <a className="text-tech-cyan hover:underline" {...props} />,
+                              h1: ({...props}) => <h1 className="text-lg font-bold mb-2 text-tech-cyan" {...props} />,
+                              h2: ({...props}) => <h2 className="text-base font-bold mb-1.5 text-tech-cyan" {...props} />,
+                              h3: ({...props}) => <h3 className="text-sm font-semibold mb-1 text-slate-300" {...props} />,
+                            }}
+                          >
+                            {displayContent}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
