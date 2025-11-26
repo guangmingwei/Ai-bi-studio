@@ -233,10 +233,11 @@ export const useAppActions = () => {
           console.log('[AI Action - generateChart] Attempting AI data mapping:', dataMapping);
           // Use AI's mapping instructions
           Object.keys(dataMapping).forEach(key => {
-            const path = dataMapping[key];
+            const path = (dataMapping as Record<string, string>)[key];
             if (typeof path === 'string') {
               // Simple path like "trend.categories"
-              const value = path.split('.').reduce((obj: Record<string, unknown>, prop: string) => obj?.[prop] as Record<string, unknown>, apiData as Record<string, unknown>);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const value = path.split('.').reduce((obj: any, prop: string) => obj?.[prop], apiData);
               if (value !== undefined) {
                 chartData[key] = value;
                 mappingSuccessful = true;
@@ -254,27 +255,30 @@ export const useAppActions = () => {
           console.log('[AI Action - generateChart] Chart type:', chartType);
           console.log('[AI Action - generateChart] Available data fields:', Object.keys(apiData));
           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = apiData as any;
+          
           // Auto-detect data structure based on chartType
           if (chartType === 'pie') {
             // 尝试多个可能的字段名
             const pieData = 
-              apiData.levelDistribution || 
-              apiData.distribution || 
-              apiData.typeDistribution || 
-              apiData.data || 
-              apiData.values;
+              data.levelDistribution || 
+              data.distribution || 
+              data.typeDistribution || 
+              data.data || 
+              data.values;
             
             chartData.data = pieData || [];
             console.log('[AI Action - generateChart] 📊 Auto-detected pie chart data field:', 
-              pieData === apiData.levelDistribution ? 'levelDistribution' :
-              pieData === apiData.distribution ? 'distribution' :
-              pieData === apiData.typeDistribution ? 'typeDistribution' : 
-              pieData === apiData.data ? 'data' : 'values'
+              pieData === data.levelDistribution ? 'levelDistribution' :
+              pieData === data.distribution ? 'distribution' :
+              pieData === data.typeDistribution ? 'typeDistribution' : 
+              pieData === data.data ? 'data' : 'values'
             );
             console.log('[AI Action - generateChart] 📊 Pie data:', chartData.data);
           } else if (chartType === 'line' || chartType === 'bar') {
-            chartData.xAxis = apiData.trend?.categories || apiData.categories || [];
-            chartData.series = apiData.trend?.series || apiData.series || apiData.trend?.data || [];
+            chartData.xAxis = data.trend?.categories || data.categories || [];
+            chartData.series = data.trend?.series || data.series || data.trend?.data || [];
             console.log('[AI Action - generateChart] 📈 Auto-detected line/bar chart data:', { 
               xAxis: chartData.xAxis, 
               series: chartData.series,
@@ -315,6 +319,61 @@ export const useAppActions = () => {
         console.error('[AI Action - generateChart] ===== HANDLER ERROR =====');
         console.error('[AI Action - generateChart] Error details:', error);
         return `生成图表失败：${(error as Error).message}`;
+      }
+    },
+  });
+
+  // Generate Insight/Summary Action
+  useCopilotAction({
+    name: "generateInsight",
+    description: "Generate text-based insights, summaries, or analysis reports. Use this when user asks for conclusions, summaries, or detailed analysis beyond charts.",
+    parameters: [
+      {
+        name: "title",
+        type: "string",
+        description: "Title of the insight/summary in Chinese",
+        required: true,
+      },
+      {
+        name: "content",
+        type: "string",
+        description: "The analysis content in Markdown format. Can include headings, lists, bold/italic text, tables, etc.",
+        required: true,
+      },
+      {
+        name: "contentType",
+        type: "string",
+        description: "Content format: markdown (default), text (plain text), html (HTML content)",
+      },
+      {
+        name: "layout",
+        type: "string",
+        description: "Layout size: full (占满一行), half (占半行，可与图表并排)",
+      }
+    ],
+    handler: async ({ title, content, contentType = 'markdown', layout = 'half' }) => {
+      console.log('[AI Action - generateInsight] ===== HANDLER CALLED =====');
+      console.log('[AI Action - generateInsight] Parameters:', { title, contentType, layout, contentLength: content.length });
+      
+      try {
+        const config = {
+          id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: contentType as 'text' | 'markdown' | 'html',
+          title,
+          content,
+          data: {},
+          timestamp: Date.now(),
+          layout: layout as 'full' | 'half',
+        };
+        
+        console.log('[AI Action - generateInsight] Adding insight to panel...');
+        addChartConfig(config);
+        console.log('[AI Action - generateInsight] Insight added to panel');
+        
+        return `已添加"${title}"分析总结到数据分析面板`;
+      } catch (error) {
+        console.error('[AI Action - generateInsight] Error:', error);
+        return `生成分析总结失败：${(error as Error).message}`;
       }
     },
   });

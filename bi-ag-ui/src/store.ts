@@ -25,13 +25,15 @@ export interface PatrolConfig {
 // 图表配置接口
 export interface ChartConfig {
   id: string; // 唯一标识
-  type: 'chart' | 'table' | 'custom';
+  type: 'chart' | 'table' | 'custom' | 'text' | 'markdown' | 'html';
   chartType?: 'line' | 'bar' | 'pie' | 'scatter' | 'radar';
   title?: string;
   description?: string;
   data: Record<string, unknown>;
   options?: Record<string, unknown>;
+  content?: string; // 用于text/markdown/html类型
   timestamp: number; // 创建时间
+  layout?: 'full' | 'half'; // 布局：full=占满整行，half=占半行
 }
 
 interface AppState {

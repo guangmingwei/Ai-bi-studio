@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import * as echarts from 'echarts/core';
 import {
   LineChart,
@@ -39,13 +42,14 @@ interface DynamicUIRendererProps {
    * AI生成的配置对象
    */
   config: {
-    type: 'chart' | 'table' | 'custom';
+    type: 'chart' | 'table' | 'custom' | 'text' | 'markdown' | 'html';
     chartType?: 'line' | 'bar' | 'pie' | 'scatter' | 'radar';
     title?: string;
     description?: string;
     data: any;
     options?: any; // ECharts options
     customCode?: string; // 自定义React组件代码
+    content?: string; // 用于text/markdown/html类型
   };
   className?: string;
 }
@@ -402,6 +406,35 @@ export const DynamicUIRenderer: React.FC<DynamicUIRendererProps> = ({
       {config.type === 'table' && renderTable()}
 
       {config.type === 'custom' && renderCustom()}
+      
+      {/* 纯文本渲染 */}
+      {config.type === 'text' && config.content && (
+        <div className="prose prose-invert max-w-none">
+          <div className="whitespace-pre-wrap text-gray-300 leading-relaxed">
+            {config.content}
+          </div>
+        </div>
+      )}
+      
+      {/* Markdown渲染 */}
+      {config.type === 'markdown' && config.content && (
+        <div className="prose prose-invert max-w-none prose-headings:text-tech-cyan prose-a:text-blue-400 prose-code:text-green-400 prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+          >
+            {config.content}
+          </ReactMarkdown>
+        </div>
+      )}
+      
+      {/* HTML渲染 */}
+      {config.type === 'html' && config.content && (
+        <div 
+          className="html-content prose prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: config.content }}
+        />
+      )}
     </div>
   );
 };
