@@ -9,11 +9,12 @@ export const useAppActions = () => {
     setEmergency, 
     toggleNav, 
     setPatrolConfig,
-    // 图表状态管理
-    chartConfig,
+    // 图表状态管理 - 改用多图表支持
+    addChartConfig,
+    chartConfigs,
     isChartModalOpen,
-    setChartConfig,
     setIsChartModalOpen,
+    clearChartConfigs,
   } = useAppStore();
 
   // Navigation Action
@@ -291,26 +292,25 @@ export const useAppActions = () => {
         
         // Set chart configuration to trigger modal
         const config = {
+          id: `chart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           type: 'chart' as const,
           chartType: chartType as 'line' | 'bar' | 'pie' | 'scatter' | 'radar',
           title,
           description,
           data: chartData,
+          timestamp: Date.now(),
         };
         
         console.log('[AI Action - generateChart] Final config:', config);
-        console.log('[AI Action - generateChart] Setting chart config and opening modal...');
+        console.log('[AI Action - generateChart] Adding chart to panel...');
         
-        setChartConfig(config);
-        console.log('[AI Action - generateChart] chartConfig state updated');
-        
-        setIsChartModalOpen(true);
-        console.log('[AI Action - generateChart] isChartModalOpen state updated to true');
+        addChartConfig(config);
+        console.log('[AI Action - generateChart] Chart added to panel');
         
         console.log('[AI Action - generateChart] ===== HANDLER COMPLETED =====');
         console.log('[AI Action - generateChart] Returning to CopilotKit...');
         
-        return `已生成"${title}"图表，正在显示...`;
+        return `已添加"${title}"图表到数据分析面板`;
       } catch (error) {
         console.error('[AI Action - generateChart] ===== HANDLER ERROR =====');
         console.error('[AI Action - generateChart] Error details:', error);
@@ -320,8 +320,9 @@ export const useAppActions = () => {
   });
   
   return {
-    chartConfig,
+    chartConfigs,
     isChartModalOpen,
     setIsChartModalOpen,
+    clearChartConfigs,
   };
 };

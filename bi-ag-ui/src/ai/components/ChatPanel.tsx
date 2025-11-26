@@ -9,7 +9,7 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
 import { useAppActions } from '../hooks/useAppActions';
 import { useAppStore } from '../../store';
-import ChartModal from './ChartModal';
+import DataAnalysisPanel from './DataAnalysisPanel';
 
 /**
  * ChatPanel - 嵌入式AI聊天面板组件
@@ -25,16 +25,16 @@ export const ChatPanel: React.FC = () => {
   useAppActions();
   
   // 从全局store获取图表状态
-  const { chartConfig, isChartModalOpen, setIsChartModalOpen } = useAppStore();
+  const { chartConfigs, isChartModalOpen } = useAppStore();
 
   // Debug: 监控图表状态变化
   useEffect(() => {
     console.log('[ChatPanel] Chart state changed from store:', {
-      chartConfig,
+      chartConfigs,
       isChartModalOpen,
-      hasConfig: !!chartConfig
+      chartCount: chartConfigs.length
     });
-  }, [chartConfig, isChartModalOpen]);
+  }, [chartConfigs, isChartModalOpen]);
 
   const [inputValue, setInputValue] = useState('');
   
@@ -103,6 +103,14 @@ export const ChatPanel: React.FC = () => {
     await appendMessage(new TextMessage({
       role: Role.User,
       content: content,
+    }));
+  };
+
+  // 处理从数据分析面板发送的消息
+  const handlePanelSend = async (message: string) => {
+    await appendMessage(new TextMessage({
+      role: Role.User,
+      content: message,
     }));
   };
 
@@ -497,15 +505,11 @@ export const ChatPanel: React.FC = () => {
         </div>
       </div>
       
-      {/* Chart Modal */}
-      {chartConfig && (
-        <ChartModal
-          isOpen={isChartModalOpen}
-          onClose={() => setIsChartModalOpen(false)}
-          config={chartConfig}
-          title={chartConfig.title}
-        />
-      )}
+      {/* Data Analysis Panel */}
+      <DataAnalysisPanel 
+        onSendMessage={handlePanelSend}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

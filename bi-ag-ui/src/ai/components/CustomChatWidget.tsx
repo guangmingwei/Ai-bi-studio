@@ -9,7 +9,7 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
 import { useAppActions } from '../hooks/useAppActions';
 import { useAppStore } from '../../store';
-import ChartModal from './ChartModal';
+import DataAnalysisPanel from './DataAnalysisPanel';
 
 export const CustomChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,7 +22,7 @@ export const CustomChatWidget = () => {
   useAppActions();
   
   // 从全局store获取图表状态
-  const { chartConfig, isChartModalOpen, setIsChartModalOpen } = useAppStore();
+  const { chartConfigs, isChartModalOpen } = useAppStore();
 
   const [inputValue, setInputValue] = useState('');
 
@@ -46,6 +46,14 @@ export const CustomChatWidget = () => {
     await appendMessage(new TextMessage({
       role: Role.User,
       content: content,
+    }));
+  };
+
+  // 处理从数据分析面板发送的消息
+  const handlePanelSend = async (message: string) => {
+    await appendMessage(new TextMessage({
+      role: Role.User,
+      content: message,
     }));
   };
 
@@ -489,15 +497,11 @@ export const CustomChatWidget = () => {
         )}
       </AnimatePresence>
       
-      {/* Chart Modal */}
-      {chartConfig && (
-        <ChartModal
-          isOpen={isChartModalOpen}
-          onClose={() => setIsChartModalOpen(false)}
-          config={chartConfig}
-          title={chartConfig.title}
-        />
-      )}
+      {/* Data Analysis Panel */}
+      <DataAnalysisPanel 
+        onSendMessage={handlePanelSend}
+        isLoading={isLoading}
+      />
     </>
   );
 };

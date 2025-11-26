@@ -24,12 +24,14 @@ export interface PatrolConfig {
 
 // 图表配置接口
 export interface ChartConfig {
+  id: string; // 唯一标识
   type: 'chart' | 'table' | 'custom';
   chartType?: 'line' | 'bar' | 'pie' | 'scatter' | 'radar';
   title?: string;
   description?: string;
   data: Record<string, unknown>;
   options?: Record<string, unknown>;
+  timestamp: number; // 创建时间
 }
 
 interface AppState {
@@ -63,9 +65,11 @@ interface AppState {
   setPatrolConfig: (config: Partial<PatrolConfig>) => void;
   
   // 图表模态框状态
-  chartConfig: ChartConfig | null;
+  chartConfigs: ChartConfig[]; // 改为数组，支持多个图表
   isChartModalOpen: boolean;
-  setChartConfig: (config: ChartConfig | null) => void;
+  addChartConfig: (config: ChartConfig) => void; // 添加图表
+  removeChartConfig: (id: string) => void; // 移除图表
+  clearChartConfigs: () => void; // 清空所有图表
   setIsChartModalOpen: (isOpen: boolean) => void;
   
   // 引导层状态
@@ -107,11 +111,24 @@ export const useAppStore = create<AppState>()(
       })),
       
       // 图表模态框状态
-      chartConfig: null,
+      chartConfigs: [],
       isChartModalOpen: false,
-      setChartConfig: (config) => {
-        console.log('[Store] Setting chartConfig:', config);
-        set({ chartConfig: config });
+      addChartConfig: (config) => {
+        console.log('[Store] Adding chart config:', config);
+        set((state) => ({
+          chartConfigs: [...state.chartConfigs, config],
+          isChartModalOpen: true, // 自动打开面板
+        }));
+      },
+      removeChartConfig: (id) => {
+        console.log('[Store] Removing chart config:', id);
+        set((state) => ({
+          chartConfigs: state.chartConfigs.filter(c => c.id !== id),
+        }));
+      },
+      clearChartConfigs: () => {
+        console.log('[Store] Clearing all chart configs');
+        set({ chartConfigs: [] });
       },
       setIsChartModalOpen: (isOpen) => {
         console.log('[Store] Setting isChartModalOpen:', isOpen);
