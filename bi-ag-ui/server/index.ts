@@ -412,8 +412,8 @@ generateInsight({
 
 class SiliconFlowAdapter extends OpenAIAdapter {
     constructor() {
-        // Changed to MiniMax-M2 (non-thinking model) to avoid infinite loops
-        super({ openai: openai as any, model: "MiniMaxAI/MiniMax-M2" });
+        // Using DeepSeek-V3.2-Exp model
+        super({ openai: openai as any, model: "deepseek-ai/DeepSeek-V3.2-Exp" });
     }
 
     async process(request: any): Promise<any> {
@@ -773,10 +773,10 @@ class SiliconFlowAdapter extends OpenAIAdapter {
             };
 
             try {
-                console.log("[SiliconFlowAdapter] Requesting streaming completion from SiliconFlow (MiniMax-M2)...");
+                console.log("[SiliconFlowAdapter] Requesting streaming completion from SiliconFlow (DeepSeek-V3.2-Exp)...");
 
                 const payload = {
-                    model: "MiniMaxAI/MiniMax-M2",
+                    model: "deepseek-ai/DeepSeek-V3.2-Exp",
                     messages: openAIMessages,
                     tools: tools,
                     stream: true,
@@ -801,7 +801,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     const delta = chunk.choices[0].delta;
                     if (!delta) continue;
 
-                    // Handle content streaming (MiniMax-M2 doesn't have reasoning_content)
+                    // Handle content streaming (DeepSeek-V3.2-Exp)
                     const content = delta.content || "";
                     
                     if (content) {
@@ -923,6 +923,9 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     }
                     
                     messageId = `msg_${Date.now()}`;
+                    // 将fallback消息添加到缓冲区，以便日志正确显示
+                    fullMessageBuffer.push(fallbackMessage);
+                    
                     eventStream$.sendTextMessageStart({ messageId });
                     eventStream$.sendTextMessageContent({
                         messageId,
