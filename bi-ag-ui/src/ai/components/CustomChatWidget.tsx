@@ -7,7 +7,6 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
-import { useAppActions } from '../hooks/useAppActions';
 import { useAppStore } from '../../store';
 
 export const CustomChatWidget = () => {
@@ -17,11 +16,15 @@ export const CustomChatWidget = () => {
   // 使用 CopilotKit 的核心 Chat Hook
   const { visibleMessages, appendMessage, isLoading } = useCopilotChat();
   
-  // 注册 AI Actions (这会在全局store中设置状态)
-  useAppActions();
-  
-  // 从全局store获取图表状态
+  // 从全局store获取状态（Actions已在App.tsx中注册）
   const { chartConfigs, isChartModalOpen } = useAppStore();
+  useEffect(() => {
+    console.log('[CustomChatWidget] Chart state changed from store:', {
+      chartConfigs,
+      isChartModalOpen,
+      chartCount: chartConfigs.length
+    });
+  }, [chartConfigs, isChartModalOpen]);
 
   const [inputValue, setInputValue] = useState('');
 
@@ -48,14 +51,6 @@ export const CustomChatWidget = () => {
     }));
   };
 
-  // 处理从数据分析面板发送的消息
-  const handlePanelSend = async (message: string) => {
-    await appendMessage(new TextMessage({
-      role: Role.User,
-      content: message,
-    }));
-  };
-
   // 处理语音输入
   const handleVoiceInput = async () => {
     if (isRecording) {
@@ -71,7 +66,12 @@ export const CustomChatWidget = () => {
         const result = await speechToText(audioBlob);
         
         if (result.text) {
-          setInputValue(result.text);
+          // 语音识别成功后自动发送，不再需要用户手动点击发送按钮
+          console.log('[CustomChatWidget] Voice recognized, auto-sending:', result.text);
+          await appendMessage(new TextMessage({
+            role: Role.User,
+            content: result.text,
+          }));
         } else {
           setVoiceError('未识别到语音内容');
         }

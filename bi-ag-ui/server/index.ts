@@ -219,12 +219,14 @@ const SYSTEM_PROMPT = `你是成都智友辰科技有限公司于2025年发布�
 3. 禁止使用Markdown符号（如 -、*、#），用自然语言表达
 4. 列举时用"第一、第二"或"首先、其次"，不用短横线
 
-**可用功能**：
-- 导航页面：综合态势、监控中心、预警中心、巡查治理、广播喊话
-- 切换模式：监控墙、地图、AI助手
-- 紧急模式：启动或关闭应急响应
-- 巡逻配置：自动切换摄像头
-- 数据可视化：generateChart（生成图表）、generateInsight（生成分析总结）
+**你可以执行的操作（通过调用工具实现）**：
+- 导航页面（navigateToPage工具）：综合态势、监控中心、预警中心、巡查治理、广播喊话
+- 切换模式（setDashboardMode工具）：监控墙、地图、AI助手
+- 紧急模式（setEmergencyMode工具）：启动或关闭应急响应
+- 巡逻配置（configurePatrol工具）：自动切换摄像头
+- 数据可视化（generateChart、generateInsight工具）：生成图表和分析总结
+
+**重要：当用户要求执行上述任何操作时，你必须调用对应的工具，不要说"无法执行"。**
 
 ================================================================================
 【核心交互规则 - 数据分析与图表生成】
@@ -299,13 +301,36 @@ generateInsight({
 })
 
 ================================================================================
-【其他工具使用规则】
+【重要：页面导航和操作控制 - 必须调用工具】
 ================================================================================
 
-**导航、模式切换等操作**：直接执行，无需确认
-- 用户说"打开监控中心" → 直接调用 navigateToPage
-- 用户说"启动紧急模式" → 直接调用 setEmergencyMode
-- 调用后回复执行结果，如"已切换到监控中心"
+**你拥有以下工具，必须在用户请求时调用它们执行操作：**
+
+1. **navigateToPage** - 页面导航工具（必须使用）
+   - page参数：dashboard/monitor/alert/patrol/broadcast
+   - 用户说"打开广播喊话" → 调用 navigateToPage({ page: "broadcast" })
+   - 用户说"切换到监控中心" → 调用 navigateToPage({ page: "monitor" })
+   - 用户说"去预警中心" → 调用 navigateToPage({ page: "alert" })
+   - 用户说"打开巡查治理" → 调用 navigateToPage({ page: "patrol" })
+   - 用户说"回到主页/大屏" → 调用 navigateToPage({ page: "dashboard" })
+
+2. **setDashboardMode** - 切换仪表板模式
+   - mode参数：video-grid/map/ai-chat
+   - 用户说"打开监控墙" → 调用 setDashboardMode({ mode: "video-grid" })
+   - 用户说"显示地图" → 调用 setDashboardMode({ mode: "map" })
+
+3. **setEmergencyMode** - 紧急模式控制
+   - active参数：true/false
+   - 用户说"启动紧急模式" → 调用 setEmergencyMode({ active: true })
+   - 用户说"关闭紧急模式" → 调用 setEmergencyMode({ active: false })
+
+4. **configurePatrol** - 巡逻配置
+   - 用户说"开始自动巡逻" → 调用 configurePatrol({ active: true })
+
+**关键规则**：
+- 当用户请求导航、切换、打开任何页面时，你必须调用对应的工具
+- 绝对不要说"我无法执行"或"我没有这个功能"，因为你有这些工具
+- 直接调用工具执行操作，然后回复"已为您切换到XX页面"
 
 **工具调用时必须返回文字说明**：
 调用任何工具后，都要用中文说明执行了什么操作，不要只调用工具而不返回文字。`;
@@ -519,7 +544,10 @@ class SiliconFlowAdapter extends OpenAIAdapter {
         // Manually handle the stream events
         eventSource.stream(async (eventStream$: any) => {
             let startedTextMessage = false;
-            let messageId: string | undefined;
+            // 在流开始时就创建 messageId，确保所有事件使用相同的 ID
+            const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+            console.log(`[SiliconFlowAdapter] Created messageId: ${messageId}`);
+            
             const toolCallMap = new Map<number, string>(); // index -> id
             const toolCallNames = new Map<number, string>(); // index -> name
             const toolCallArgsBuffer = new Map<number, string>(); // index -> accumulated args
@@ -712,13 +740,13 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                         fullMessageBuffer.push(content);
                         
                         if (!startedTextMessage) {
-                            messageId = chunk.id || `msg_${Date.now()}`; 
+                            // 使用预创建的 messageId
                             eventStream$.sendTextMessageStart({ messageId });
                             startedTextMessage = true;
                             
                             // 立即发送sessionId给前端（作为第一个内容）
                             eventStream$.sendTextMessageContent({
-                                messageId: messageId!,
+                                messageId,
                                 content: `<!--AUDIO_SESSION:${sessionId}-->`
                             });
                             
@@ -727,7 +755,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                         
                         // 发送实际内容
                         eventStream$.sendTextMessageContent({
-                            messageId: messageId!,
+                            messageId,
                             content: content
                         });
                         
@@ -748,20 +776,20 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                         }
                     }
 
-                    // Handle tool calls - 累积参数，不要分块发送
+                    // Handle tool calls - 累积工具调用信息，在流结束后统一发送
                     if (delta.tool_calls) {
                         for (const toolCall of delta.tool_calls) {
                             const index = toolCall.index;
                             
                             if (toolCall.id) {
-                                // New tool call start - 只记录，不立即发送
+                                // 记录工具调用信息（不立即发送事件）
                                 const id = toolCall.id;
                                 const toolName = toolCall.function?.name || "";
                                 toolCallMap.set(index, id);
                                 toolCallNames.set(index, toolName);
                                 toolCallArgsBuffer.set(index, ""); // 初始化参数缓冲区
                                 
-                                console.log(`[Tool Call] Starting: ${toolName} (id: ${id}, index: ${index})`);
+                                console.log(`[Tool Call] Detected: ${toolName} (id: ${id}, index: ${index})`);
                                 
                                 // Track tool name for intelligent fallback
                                 if (toolName && !calledToolNames.includes(toolName)) {
@@ -771,7 +799,7 @@ class SiliconFlowAdapter extends OpenAIAdapter {
 
                             // 累积参数片段
                             const args = toolCall.function?.arguments;
-                            if (args && toolCallArgsBuffer.has(index)) {
+                            if (args) {
                                 const currentArgs = toolCallArgsBuffer.get(index) || "";
                                 toolCallArgsBuffer.set(index, currentArgs + args);
                             }
@@ -818,7 +846,6 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                         }
                     }
                     
-                    messageId = `msg_${Date.now()}`;
                     // 将fallback消息添加到缓冲区，以便日志正确显示
                     fullMessageBuffer.push(fallbackMessage);
                     
@@ -829,14 +856,12 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     });
                     eventStream$.sendTextMessageEnd({ messageId });
                     console.log(`[SiliconFlowAdapter] Sent intelligent fallback: "${fallbackMessage}" for tools: [${calledToolNames.join(', ')}]`);
-                }
-                
-                // End text message if started
-                if (startedTextMessage && messageId) {
+                } else if (startedTextMessage) {
+                    // 只有在发送了正常文本消息时才发送 End
                     eventStream$.sendTextMessageEnd({ messageId });
                 }
 
-                // 发送所有累积的工具调用（完整的参数）
+                // 发送所有工具调用事件（按顺序：Start -> Args -> End）
                 for (const [index, id] of toolCallMap.entries()) {
                     const toolName = toolCallNames.get(index) || "";
                     const fullArgs = toolCallArgsBuffer.get(index) || "{}";
@@ -844,21 +869,24 @@ class SiliconFlowAdapter extends OpenAIAdapter {
                     console.log(`[Tool Call] Sending complete tool call: ${toolName} (id: ${id})`);
                     console.log(`[Tool Call] Full args: ${fullArgs}`);
                     
-                    // 发送 ActionExecutionStart
+                    // 1. 发送 ActionExecutionStart
                     eventStream$.sendActionExecutionStart({
                         actionExecutionId: id,
                         actionName: toolName,
-                        parentMessageId: messageId || `msg_${Date.now()}`
+                        parentMessageId: messageId
                     });
+                    console.log(`[Tool Call] Sent ActionExecutionStart for: ${toolName}`);
                     
-                    // 发送完整的参数
+                    // 2. 发送完整的参数
                     eventStream$.sendActionExecutionArgs({
                         actionExecutionId: id,
                         args: fullArgs
                     });
+                    console.log(`[Tool Call] Sent ActionExecutionArgs for: ${toolName}`);
                     
-                    // 发送 ActionExecutionEnd
+                    // 3. 发送 ActionExecutionEnd
                     eventStream$.sendActionExecutionEnd({ actionExecutionId: id });
+                    console.log(`[Tool Call] Sent ActionExecutionEnd for: ${toolName}`);
                 }
                 
                 // 打印完整的AI回复内容
