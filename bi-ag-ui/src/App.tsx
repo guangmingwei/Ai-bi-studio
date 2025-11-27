@@ -18,6 +18,7 @@ import { GuideOverlay } from './components/ui/GuideOverlay';
 import { useAppKnowledge } from './ai/hooks/useAppKnowledge';
 import { useAppActions } from './ai/hooks/useAppActions';
 import { CustomChatWidget } from './ai/components/CustomChatWidget';
+import { GlobalDataAnalysisPanel } from './ai/components/GlobalDataAnalysisPanel';
 
 function App() {
   const { isNavOpen, navPosition, toggleNav, centerMode, setCenterMode, currentView, isEmergency, setEmergency, setCurrentView, setAlertNotification } = useAppStore();
@@ -114,6 +115,9 @@ function App() {
 
       {/* AI 悬浮对话窗口 - 仅在非Dashboard AI模式时显示 */}
       {shouldShowFloatingChat && <CustomChatWidget />}
+
+      {/* 全局数据分析面板 - 图表弹窗，不受父容器overflow限制 */}
+      <GlobalDataAnalysisPanel />
 
       {/* 动态背景层 (由于主内容位移，背景最好固定) */}
       <div className="fixed inset-0 pointer-events-none z-0">

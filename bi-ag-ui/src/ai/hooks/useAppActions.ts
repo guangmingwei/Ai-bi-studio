@@ -162,40 +162,40 @@ export const useAppActions = () => {
   // Generate Chart Action
   useCopilotAction({
     name: "generateChart",
-    description: "Generate data visualization charts based on statistics data. Use this when user requests data analysis, trends, or statistics. Supports different time ranges and chart types.",
+    description: "【重要工具】生成数据可视化图表。当用户要求查看数据、统计、趋势、分布、对比时，必须调用此工具生成图表，而不是只回复文字说明。支持折线图、柱状图、饼图等多种图表类型。",
     parameters: [
       {
         name: "dataSource",
         type: "string",
-        description: "API endpoint to fetch data from: /api/stats/cameras, /api/stats/alerts, /api/stats/patrol, /api/stats/system",
+        description: "数据源API端点。可选值：/api/stats/cameras（摄像头统计）、/api/stats/alerts（告警统计）、/api/stats/patrol（巡逻统计）、/api/stats/system（系统性能）",
         required: true,
       },
       {
         name: "chartType",
         type: "string",
-        description: "Type of chart: line (趋势分析), bar (对比分析), pie (占比分布), scatter (散点分析), radar (多维评估)",
+        description: "图表类型。line=折线图（趋势分析）、bar=柱状图（数量对比）、pie=饼图（占比分布）、scatter=散点图（相关性分析）、radar=雷达图（多维评估）",
         required: true,
       },
       {
         name: "title",
         type: "string",
-        description: "Chart title in Chinese",
+        description: "图表标题（中文）",
         required: true,
       },
       {
         name: "description",
         type: "string",
-        description: "Brief description of the chart",
+        description: "图表描述说明（可选）",
       },
       {
         name: "timeRange",
         type: "string",
-        description: "Time range for data: 1d (1天/24小时), 7d (7天/一周), 30d (30天/一月), 90d (90天/三月). Default: 7d",
+        description: "时间范围。1d=最近1天/24小时，7d=最近7天/一周（默认），30d=最近30天/一月，90d=最近90天/三月",
       },
       {
         name: "dataMapping",
         type: "object",
-        description: "How to map API data to chart config. Examples: {xAxis: 'trend.categories', series: 'trend.series'} for line/bar, {data: 'levelDistribution'} for pie",
+        description: "数据映射配置（可选，系统会自动检测）。用于指定如何从API数据中提取图表所需字段。示例：折线图/柱状图使用 {xAxis: 'trend.categories', series: 'trend.series'}，饼图使用 {data: 'levelDistribution'} 或 {data: 'typeDistribution'}。如果不提供，系统会自动检测数据字段。",
       }
     ],
     handler: async ({ dataSource, chartType, title, description, timeRange, dataMapping }) => {
@@ -326,29 +326,29 @@ export const useAppActions = () => {
   // Generate Insight/Summary Action
   useCopilotAction({
     name: "generateInsight",
-    description: "Generate text-based insights, summaries, or analysis reports. Use this when user asks for conclusions, summaries, or detailed analysis beyond charts.",
+    description: "【重要工具】生成文字分析总结、结论和建议。当用户要求数据分析、总结、结论、建议时，必须调用此工具。通常与generateChart配合使用，实现完整的图表加分析展示。",
     parameters: [
       {
         name: "title",
         type: "string",
-        description: "Title of the insight/summary in Chinese",
+        description: "分析总结的标题（中文），如'告警态势分析'、'数据分析报告'",
         required: true,
       },
       {
         name: "content",
         type: "string",
-        description: "The analysis content in Markdown format. Can include headings, lists, bold/italic text, tables, etc.",
+        description: "分析内容（Markdown格式）。应包含数据摘要、趋势分析、建议措施、风险评估等部分。可使用#标题、**加粗**、列表等Markdown语法。",
         required: true,
       },
       {
         name: "contentType",
         type: "string",
-        description: "Content format: markdown (default), text (plain text), html (HTML content)",
+        description: "内容类型：markdown（推荐，支持格式化）、text（纯文本）、html（HTML格式）",
       },
       {
         name: "layout",
         type: "string",
-        description: "Layout size: full (占满一行), half (占半行，可与图表并排)",
+        description: "布局方式：half（占半行，与图表并排显示，推荐）、full（占满一行）",
       }
     ],
     handler: async ({ title, content, contentType = 'markdown', layout = 'half' }) => {

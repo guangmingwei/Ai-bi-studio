@@ -9,7 +9,6 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
 import { useAppActions } from '../hooks/useAppActions';
 import { useAppStore } from '../../store';
-import DataAnalysisPanel from './DataAnalysisPanel';
 
 export const CustomChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -496,12 +495,6 @@ export const CustomChatWidget = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Data Analysis Panel */}
-      <DataAnalysisPanel 
-        onSendMessage={handlePanelSend}
-        isLoading={isLoading}
-      />
     </>
   );
 };

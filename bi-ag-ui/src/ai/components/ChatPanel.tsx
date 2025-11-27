@@ -9,7 +9,6 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { speechToText, connectAudioStream } from '../services/voiceService';
 import { useAppActions } from '../hooks/useAppActions';
 import { useAppStore } from '../../store';
-import DataAnalysisPanel from './DataAnalysisPanel';
 
 /**
  * ChatPanel - 嵌入式AI聊天面板组件
@@ -504,12 +503,6 @@ export const ChatPanel: React.FC = () => {
           </button>
         </div>
       </div>
-      
-      {/* Data Analysis Panel */}
-      <DataAnalysisPanel 
-        onSendMessage={handlePanelSend}
-        isLoading={isLoading}
-      />
     </div>
   );
 };

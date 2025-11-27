@@ -54,7 +54,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
   return (
     <AnimatePresence>
       {isChartModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           {/* 背景遮罩 */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -70,27 +70,36 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className={`relative bg-gradient-to-br from-tech-dark via-gray-900 to-gray-800 rounded-2xl shadow-2xl border border-tech-cyan/30 flex flex-col ${
+            className={`relative bg-glass backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 flex flex-col ${
               isFullscreen ? 'w-[98vw] h-[98vh]' : 'w-[90vw] max-w-7xl h-[85vh]'
             }`}
             style={{
-              boxShadow: '0 0 40px rgba(34, 211, 238, 0.2)',
+              boxShadow: '0 0 40px rgba(56, 189, 248, 0.15), 0 0 80px rgba(56, 189, 248, 0.05)',
             }}
           >
+            {/* 顶部发光装饰线 */}
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-tech-primary/50 to-transparent"></div>
             {/* 标题栏 */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-tech-cyan/20 flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-bold text-tech-cyan flex items-center gap-2">
-                  <span className="w-2 h-2 bg-tech-cyan rounded-full animate-pulse" />
-                  数据分析工作台
-                </h2>
-                <p className="text-sm text-gray-400 mt-1">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0 relative">
+              {/* 标题背景渐变 */}
+              <div className="absolute inset-0 bg-gradient-to-r from-tech-primary/10 to-transparent opacity-50"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  {/* 装饰点 */}
+                  <div className="w-1 h-4 bg-tech-primary rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)]"></div>
+                  <h2 className="text-xl font-semibold text-white tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 bg-tech-primary rounded-full animate-pulse" />
+                    数据分析工作台
+                  </h2>
+                </div>
+                <p className="text-sm text-gray-400 ml-3">
                   已添加 {chartConfigs.length} 个图表
                 </p>
               </div>
 
               {/* 工具栏 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative z-10">
                 {/* 清空按钮 */}
                 {chartConfigs.length > 0 && (
                   <button
@@ -146,9 +155,9 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                       {/* 左侧：图表区域 */}
                       <div className="lg:col-span-2 space-y-6">
-                        <div className="flex items-center gap-2 text-tech-cyan mb-4">
+                        <div className="flex items-center gap-2 text-tech-primary mb-4">
                           <BarChart3 className="w-5 h-5" />
-                          <h3 className="font-semibold">数据可视化</h3>
+                          <h3 className="font-semibold text-white">数据可视化</h3>
                         </div>
                         <div className="grid grid-cols-1 gap-6">
                           {charts.map((config) => (
@@ -157,7 +166,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -20 }}
-                              className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 hover:border-tech-cyan/30 transition-colors relative group"
+                              className="bg-glass rounded-xl p-4 border border-white/10 hover:border-tech-primary/30 transition-colors relative group backdrop-blur-sm"
                             >
                               <button
                                 onClick={() => removeChartConfig(config.id)}
@@ -179,7 +188,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                       <div className="lg:col-span-1 space-y-6">
                         <div className="flex items-center gap-2 text-green-400 mb-4">
                           <FileText className="w-5 h-5" />
-                          <h3 className="font-semibold">分析总结</h3>
+                          <h3 className="font-semibold text-white">分析总结</h3>
                         </div>
                         <div className="space-y-4">
                           {insights.map((config) => (
@@ -188,7 +197,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: 20 }}
-                              className="bg-gradient-to-br from-green-900/20 to-blue-900/20 rounded-xl p-4 border border-green-700/30 hover:border-green-500/50 transition-colors relative group"
+                              className="bg-glass rounded-xl p-4 border border-white/10 hover:border-green-400/30 transition-colors relative group backdrop-blur-sm"
                             >
                               <button
                                 onClick={() => removeChartConfig(config.id)}
@@ -198,7 +207,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                                 <X className="w-4 h-4" />
                               </button>
                               {config.title && (
-                                <h4 className="text-lg font-semibold text-green-300 mb-3">{config.title}</h4>
+                                <h4 className="text-lg font-semibold text-white mb-3">{config.title}</h4>
                               )}
                               <DynamicUIRenderer config={config} />
                             </motion.div>
@@ -215,7 +224,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className={`bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 hover:border-tech-cyan/30 transition-colors relative group ${
+                          className={`bg-glass rounded-xl p-4 border border-white/10 hover:border-tech-primary/30 transition-colors relative group backdrop-blur-sm ${
                             config.layout === 'full' ? 'lg:col-span-2' : ''
                           }`}
                         >
@@ -227,7 +236,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                             <X className="w-4 h-4" />
                           </button>
                           {config.title && (
-                            <h4 className="text-lg font-semibold text-tech-cyan mb-3">{config.title}</h4>
+                            <h4 className="text-lg font-semibold text-white mb-3">{config.title}</h4>
                           )}
                           <DynamicUIRenderer config={config} />
                         </motion.div>
@@ -240,7 +249,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
             </div>
 
             {/* 对话输入区域 */}
-            <div className="border-t border-tech-cyan/20 p-4 flex-shrink-0 bg-gray-900/50">
+            <div className="border-t border-white/10 p-4 flex-shrink-0 bg-white/5 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -249,12 +258,12 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                   onKeyPress={handleKeyPress}
                   placeholder="继续与AI对话，生成更多图表分析..."
                   disabled={isLoading}
-                  className="flex-1 bg-gray-800/80 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-tech-cyan/50 focus:ring-1 focus:ring-tech-cyan/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-slate-900/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-tech-primary/50 focus:ring-1 focus:ring-tech-primary/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!inputValue.trim() || isLoading}
-                  className="px-6 py-3 bg-tech-cyan hover:bg-tech-cyan/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-tech-cyan/20"
+                  className="px-6 py-3 bg-tech-primary hover:bg-tech-primary/80 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-tech-primary/20"
                 >
                   {isLoading ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -276,7 +285,7 @@ export const DataAnalysisPanel: React.FC<DataAnalysisPanelProps> = ({
                       }
                     }}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg text-sm transition-all border border-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-all border border-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                   >
                     ✨ 一键生成分析总结
                   </button>
