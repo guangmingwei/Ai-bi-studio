@@ -249,72 +249,15 @@ const ARK_API_BASE = 'https://ark.cn-beijing.volces.com/api/v3';
  * 这里提供一个基础实现，可能需要根据实际API文档调整
  */
 async function callVolcEngineASR(audioBuffer: Buffer, appId: string, accessToken: string): Promise<string> {
-  // 根据参考项目，ASR可能需要使用任务提交方式
-  // 但当前场景需要实时识别，暂时使用简化的HTTP API尝试
-  // 如果失败，会fallback到SiliconFlow
+  // 根据参考项目，火山引擎ASR API使用任务提交方式
+  // 需要先上传音频文件到存储，然后提交任务
+  // 但当前场景需要实时识别，这里暂时跳过HTTP API，直接fallback到SiliconFlow
+  // 因为实时语音通话已经使用WebSocket ASR客户端，这个函数主要用于传统语音输入
   
-  const url = `${VOLCENGINE_API_BASE}/api/v3/auc/bigmodel/submit`;
-  const requestId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  
-  // 注意：实际API可能需要音频URL而不是直接上传文件
-  // 这里先尝试直接上传的方式
-  const FormData = (await import('form-data')).default;
-  const formData = new FormData();
-  
-  // 根据参考项目，使用正确的header格式
-  const headers = {
-    'X-Api-App-Key': appId,
-    'X-Api-Access-Key': accessToken,
-    'X-Api-Resource-Id': 'volc.bigasr.auc',
-    'X-Api-Request-Id': requestId,
-    'X-Api-Sequence': '-1',
-    ...formData.getHeaders()
-  };
-  
-  // 尝试直接上传音频文件
-  formData.append('audio', audioBuffer, {
-    filename: 'audio.webm',
-    contentType: 'audio/webm'
-  });
-  formData.append('format', 'webm');
-  formData.append('sample_rate', '16000');
-  
-  try {
-    const response = await axios.post(url, formData, {
-      headers,
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity
-    });
-    
-    // 检查响应状态（参考项目使用X-Api-Status-Code header）
-    const statusCode = response.headers['x-api-status-code'];
-    if (statusCode && statusCode !== '20000000') {
-      throw new Error(`ASR API returned status code: ${statusCode}`);
-    }
-    
-    // 根据实际API响应格式解析
-    const result = response.data;
-    if (result.result && result.result.text) {
-      return result.result.text;
-    } else if (result.text) {
-      return result.text;
-    } else if (result.data && result.data.text) {
-      return result.data.text;
-    }
-    
-    console.warn('[VolcEngine ASR] Unexpected response format:', JSON.stringify(result));
-    return '';
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      const responseData = error.response?.data;
-      console.error('[VolcEngine ASR] API Error:', status);
-      console.error('[VolcEngine ASR] Error Response:', responseData);
-    } else {
-      console.error('[VolcEngine ASR] Error:', error);
-    }
-    throw error;
-  }
+  // 注意：火山引擎ASR的HTTP API主要用于异步任务提交，不适合实时场景
+  // 实时场景应该使用WebSocket客户端（已在websocket-handler.ts中实现）
+  // 这里直接抛出错误，让系统fallback到SiliconFlow
+  throw new Error('VolcEngine ASR HTTP API not suitable for real-time recognition. Use WebSocket client instead.');
 }
 
 /**
@@ -535,12 +478,35 @@ const copilotRuntime = new CopilotRuntime();
 const SYSTEM_PROMPT = `你是成都智友辰科技有限公司于2025年发布的AI综合安防风险治理平台助手。
 你的职责是协助用户管理安防系统、监控视频流、处理警报和执行巡逻任务。
 
+================================================================================
+【AI角色定义与核心能力】
+================================================================================
+
 **关于你的身份信息**（当用户询问时务必准确回答）：
 - 开发公司：成都智友辰科技有限公司
 - 产品名称：AI综合安防风险治理平台助手
 - 发布时间：2025年
 - 你的角色：智能安防助手，专注于综合安防风险治理
 - 当用户问"你是谁"、"你是什么系统"等问题时，简洁回答你的身份即可
+
+**你的核心能力**：
+1. **自然语言理解**：能够理解用户的中文语音和文本指令
+2. **智能对话**：能够进行流畅的中文对话，回答用户问题
+3. **工具调用能力**：这是你的核心能力！你可以通过调用预定义的工具来直接操作系统界面和执行操作
+4. **数据分析**：能够分析安防数据并生成可视化图表
+5. **实时响应**：支持实时语音通话，能够边听边理解边执行
+
+**工具调用机制说明**：
+- 你拥有直接操作系统界面的能力，这是通过"工具调用"（Function Calling）实现的
+- 当用户要求执行操作时（如"打开监控中心"），你必须调用对应的工具函数
+- 工具调用会自动执行，无需用户手动操作
+- 工具调用后，系统会立即响应，界面会相应变化
+- 你必须在回复中说明已执行的操作，让用户知道操作已完成
+
+**重要提示**：
+- 你是一个"行动型"AI助手，不仅能回答问题，更能直接执行操作
+- 当用户说"打开XX"、"切换到XX"、"显示XX"时，不要只是回复"好的"，而要立即调用工具执行
+- 工具调用是你的核心优势，充分利用这个能力为用户提供便捷的操作体验
 
 **基本规则**：
 1. 所有回复必须使用中文
@@ -630,36 +596,90 @@ generateInsight({
 })
 
 ================================================================================
-【重要：页面导航和操作控制 - 必须调用工具】
+【工具调用能力详解 - 你的核心功能】
 ================================================================================
 
-**你拥有以下工具，必须在用户请求时调用它们执行操作：**
+**工具调用是什么？**
+工具调用（Function Calling）是你的核心能力，允许你直接操作系统界面和执行操作。
+当用户提出操作需求时，你可以通过调用预定义的工具函数来立即执行，无需用户手动操作。
 
-1. **navigateToPage** - 页面导航工具（必须使用）
-   - page参数：dashboard/monitor/alert/patrol/broadcast
-   - 用户说"打开广播喊话" → 调用 navigateToPage({ page: "broadcast" })
-   - 用户说"切换到监控中心" → 调用 navigateToPage({ page: "monitor" })
-   - 用户说"去预警中心" → 调用 navigateToPage({ page: "alert" })
-   - 用户说"打开巡查治理" → 调用 navigateToPage({ page: "patrol" })
-   - 用户说"回到主页/大屏" → 调用 navigateToPage({ page: "dashboard" })
+**工具调用的工作流程**：
+1. 用户提出需求（如"打开监控中心"）
+2. 你识别需求并选择对应的工具
+3. 你调用工具函数，传入正确的参数
+4. 系统自动执行操作，界面立即响应
+5. 你向用户确认操作已完成
 
-2. **setDashboardMode** - 切换仪表板模式
-   - mode参数：video-grid/map/ai-chat
-   - 用户说"打开监控墙" → 调用 setDashboardMode({ mode: "video-grid" })
-   - 用户说"显示地图" → 调用 setDashboardMode({ mode: "map" })
+**你拥有的工具列表**：
+
+1. **navigateToPage** - 页面导航工具（最常用）
+   - 功能：在系统不同页面间切换
+   - page参数可选值：
+     * "dashboard" - 综合态势（主页/大屏）
+     * "monitor" - 监控中心
+     * "alert" - 预警中心
+     * "patrol" - 巡查治理
+     * "broadcast" - 广播喊话
+   - 调用示例：
+     * 用户说"打开监控中心" → navigateToPage({ page: "monitor" })
+     * 用户说"切换到预警中心" → navigateToPage({ page: "alert" })
+     * 用户说"去广播喊话" → navigateToPage({ page: "broadcast" })
+     * 用户说"回到主页" → navigateToPage({ page: "dashboard" })
+
+2. **setDashboardMode** - 切换仪表板中心面板模式
+   - 功能：改变综合态势页面的中心显示模式
+   - mode参数可选值：
+     * "video-grid" - 监控墙（视频网格）
+     * "map" - 地图模式
+     * "ai-chat" - AI助手模式
+   - 调用示例：
+     * 用户说"打开监控墙" → setDashboardMode({ mode: "video-grid" })
+     * 用户说"显示地图" → setDashboardMode({ mode: "map" })
 
 3. **setEmergencyMode** - 紧急模式控制
-   - active参数：true/false
-   - 用户说"启动紧急模式" → 调用 setEmergencyMode({ active: true })
-   - 用户说"关闭紧急模式" → 调用 setEmergencyMode({ active: false })
+   - 功能：启动或关闭应急响应模式
+   - active参数：true（启动）/ false（关闭）
+   - 调用示例：
+     * 用户说"启动紧急模式" → setEmergencyMode({ active: true })
+     * 用户说"关闭紧急模式" → setEmergencyMode({ active: false })
 
 4. **configurePatrol** - 巡逻配置
-   - 用户说"开始自动巡逻" → 调用 configurePatrol({ active: true })
+   - 功能：配置自动巡逻功能
+   - 参数：
+     * active: true/false - 是否启用
+     * interval: number（可选）- 切换间隔（分钟）
+   - 调用示例：
+     * 用户说"开始自动巡逻" → configurePatrol({ active: true })
+     * 用户说"停止巡逻" → configurePatrol({ active: false })
 
-**关键规则**：
-- 当用户请求导航、切换、打开任何页面时，你必须调用对应的工具
-- 绝对不要说"我无法执行"或"我没有这个功能"，因为你有这些工具
-- 直接调用工具执行操作，然后回复"已为您切换到XX页面"
+5. **generateChart** - 生成数据图表
+   - 功能：生成数据可视化图表
+   - 参数：dataSource（数据源）、chartType（图表类型）、title（标题）、timeRange（时间范围）
+   - 详见下方"数据分析与图表生成"章节
+
+6. **generateInsight** - 生成分析报告
+   - 功能：生成文字分析总结
+   - 参数：title（标题）、content（内容）、contentType（格式）、layout（布局）
+   - 详见下方"数据分析与图表生成"章节
+
+**工具调用的关键规则**：
+1. **必须调用工具**：当用户明确要求执行操作时，你必须调用工具，不要说"我无法执行"
+2. **立即执行**：识别到操作需求后，立即调用工具，不要犹豫或询问
+3. **参数准确**：确保传入的参数值正确，参考上述参数说明
+4. **确认反馈**：工具调用后，必须用中文向用户确认操作已完成
+5. **组合使用**：可以同时调用多个工具完成复杂任务
+
+**工具调用的响应格式**：
+- 调用工具后，回复格式："已为您[操作描述]"
+- 示例：
+  * 调用 navigateToPage({ page: "monitor" }) 后 → "已为您切换到监控中心"
+  * 调用 setEmergencyMode({ active: true }) 后 → "已启动紧急模式"
+  * 调用 configurePatrol({ active: true }) 后 → "已开始自动巡逻"
+
+**常见错误避免**：
+- ❌ 错误："我无法打开监控中心" → ✅ 正确：直接调用 navigateToPage({ page: "monitor" })
+- ❌ 错误："您可以手动点击监控中心按钮" → ✅ 正确：直接调用工具执行
+- ❌ 错误："好的，我帮您打开"（但不调用工具） → ✅ 正确：调用工具 + 确认回复
 
 **工具调用时必须返回文字说明**：
 调用任何工具后，都要用中文说明执行了什么操作，不要只调用工具而不返回文字。`;
@@ -1443,9 +1463,27 @@ class VolcEngineAdapter extends OpenAIAdapter {
             }
         };
 
-        // 注意：火山方舟的工具调用支持可能需要不同的实现
-        // 当前先实现基础功能，工具调用功能待后续完善
-        // const tools = actions && actions.length > 0 ? actions.map(...) : undefined;
+        // 构建工具定义（与SiliconFlowAdapter相同）
+        const tools = actions && actions.length > 0 ? actions.map((action: any) => {
+            const schema = KNOWN_ACTION_SCHEMAS[action.name];
+            if (!schema) {
+                console.warn(`[VolcEngineAdapter] Unknown action: ${action.name}`);
+                return null;
+            }
+            return {
+                type: "function",
+                function: {
+                    name: action.name,
+                    description: action.description || schema.description || "",
+                    parameters: schema
+                }
+            };
+        }).filter((tool: any) => tool !== null) : undefined;
+        
+        console.log(`[VolcEngineAdapter] Tools count: ${tools?.length || 0}`);
+        if (tools && tools.length > 0) {
+            console.log(`[VolcEngineAdapter] Tool names: ${tools.map((t: any) => t.function.name).join(", ")}`);
+        }
 
         // 处理流式响应
         eventSource.stream(async (eventStream$: any) => {
@@ -1522,35 +1560,260 @@ class VolcEngineAdapter extends OpenAIAdapter {
                 console.log("[VolcEngineAdapter] Messages count:", openAIMessages.length);
                 console.log("[VolcEngineAdapter] First message:", openAIMessages[0]?.role, openAIMessages[0]?.content?.substring(0, 100));
 
-                // 调用火山方舟LLM
+                // 调用火山方舟LLM（直接处理流式响应，支持工具调用）
                 let hasContent = false;
+                let toolCallMap = new Map<number, { id: string; name: string; args: string }>(); // index -> tool call info
+                let hasToolCalls = false;
+                let fullMessageBuffer = '';
+                let functionCallBuffer = ''; // 用于累积工具调用格式的内容
+                let inFunctionCall = false; // 是否在工具调用块中
+                
                 try {
-                    for await (const content of callVolcEngineLLM(openAIMessages, LLM_ENDPOINT_ID, ARK_API_KEY)) {
-                        hasContent = true;
-                        if (!startedTextMessage) {
-                            eventStream$.sendTextMessageStart({ messageId });
-                            startedTextMessage = true;
-                            
-                            eventStream$.sendTextMessageContent({
-                                messageId,
-                                content: `<!--AUDIO_SESSION:${sessionId}-->`
-                            });
+                    // 直接调用API，不使用callVolcEngineLLM，以便处理工具调用
+                    const llmPayload = {
+                        model: LLM_ENDPOINT_ID,
+                        messages: openAIMessages,
+                        stream: true,
+                        temperature: 0.7,
+                        max_tokens: 4096,
+                        ...(tools && tools.length > 0 ? { tools: tools } : {})
+                    };
+                    
+                    const llmResponse = await axios.post(
+                        `${ARK_API_BASE}/chat/completions`,
+                        llmPayload,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${ARK_API_KEY}`,
+                                'Content-Type': 'application/json'
+                            },
+                            responseType: 'stream'
                         }
+                    );
+                    
+                    // 解析SSE流
+                    let buffer = '';
+                    for await (const chunk of llmResponse.data) {
+                        buffer += chunk.toString();
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
                         
-                        eventStream$.sendTextMessageContent({
-                            messageId,
-                            content: content
-                        });
-                        
-                        fullMessageBuffer += content;
-                        ttsBuffer += content;
-                        
-                        if (ttsBuffer.length >= TTS_THRESHOLD) {
-                            const chunks = splitTextBySentences(ttsBuffer, TTS_THRESHOLD);
-                            for (let i = 0; i < chunks.length - 1; i++) {
-                                await sendTTSChunk(chunks[i]);
+                        for (const line of lines) {
+                            if (line.trim() === '') continue;
+                            
+                            if (line.startsWith('data: ')) {
+                                const data = line.substring(6).trim();
+                                if (data === '[DONE]') {
+                                    // 处理工具调用
+                                    if (hasToolCalls && toolCallMap.size > 0) {
+                                        console.log(`[VolcEngineAdapter] 检测到工具调用，发送ActionExecution事件`);
+                                        for (const [index, toolCall] of toolCallMap.entries()) {
+                                            try {
+                                                const args = JSON.parse(toolCall.args || '{}');
+                                                console.log(`[VolcEngineAdapter] 工具调用: ${toolCall.name}(${JSON.stringify(args)})`);
+                                                
+                                                // 发送工具调用事件
+                                                eventStream$.sendActionExecutionStart({
+                                                    actionName: toolCall.name,
+                                                    actionExecutionId: toolCall.id
+                                                });
+                                                
+                                                // args 必须是字符串格式的 JSON
+                                                const argsString = typeof args === 'string' 
+                                                    ? args 
+                                                    : JSON.stringify(args || {});
+                                                
+                                                eventStream$.sendActionExecutionArgs({
+                                                    actionExecutionId: toolCall.id,
+                                                    args: argsString
+                                                });
+                                                
+                                                eventStream$.sendActionExecutionEnd({
+                                                    actionExecutionId: toolCall.id
+                                                });
+                                            } catch (e) {
+                                                console.error(`[VolcEngineAdapter] 解析工具参数失败:`, e);
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+                                
+                                try {
+                                    const json = JSON.parse(data);
+                                    
+                                    // 检查工具调用（标准格式）
+                                    const delta = json.choices?.[0]?.delta;
+                                    if (delta?.tool_calls) {
+                                        hasToolCalls = true;
+                                        for (const toolCall of delta.tool_calls) {
+                                            const index = toolCall.index;
+                                            if (toolCall.id) {
+                                                toolCallMap.set(index, {
+                                                    id: toolCall.id,
+                                                    name: toolCall.function?.name || '',
+                                                    args: toolCallMap.get(index)?.args || ''
+                                                });
+                                            }
+                                            if (toolCall.function?.arguments) {
+                                                const currentArgs = toolCallMap.get(index)?.args || '';
+                                                toolCallMap.set(index, {
+                                                    id: toolCallMap.get(index)?.id || '',
+                                                    name: toolCall.function?.name || toolCallMap.get(index)?.name || '',
+                                                    args: currentArgs + toolCall.function.arguments
+                                                });
+                                            }
+                                        }
+                                        console.log(`[VolcEngineAdapter] 检测到工具调用增量`);
+                                        continue; // 工具调用时不处理文本内容
+                                    }
+                                    
+                                    // 检查finish_reason是否为tool_calls
+                                    if (json.choices?.[0]?.finish_reason === 'tool_calls') {
+                                        hasToolCalls = true;
+                                        console.log(`[VolcEngineAdapter] LLM完成，finish_reason为tool_calls`);
+                                    }
+                                    
+                                    // 处理文本内容
+                                    let content = json.choices?.[0]?.delta?.content || 
+                                                  json.choices?.[0]?.message?.content || 
+                                                  json.content || '';
+                                    
+                                    if (content) {
+                                        // 检查是否是工具调用格式（<|FunctionCallBegin|>...<|FunctionCallEnd|>）
+                                        if (content.includes('<|FunctionCallBegin|>')) {
+                                            inFunctionCall = true;
+                                            functionCallBuffer = '';
+                                            const beginIndex = content.indexOf('<|FunctionCallBegin|>');
+                                            if (beginIndex > 0) {
+                                                // 处理工具调用前的文本
+                                                const beforeText = content.substring(0, beginIndex);
+                                                if (beforeText.trim()) {
+                                                    hasContent = true;
+                                                    if (!startedTextMessage) {
+                                                        eventStream$.sendTextMessageStart({ messageId });
+                                                        startedTextMessage = true;
+                                                        eventStream$.sendTextMessageContent({
+                                                            messageId,
+                                                            content: `<!--AUDIO_SESSION:${sessionId}-->`
+                                                        });
+                                                    }
+                                                    eventStream$.sendTextMessageContent({
+                                                        messageId,
+                                                        content: beforeText
+                                                    });
+                                                    fullMessageBuffer += beforeText;
+                                                    ttsBuffer += beforeText;
+                                                }
+                                            }
+                                            functionCallBuffer += content.substring(beginIndex + '<|FunctionCallBegin|>'.length);
+                                        } else if (inFunctionCall) {
+                                            // 在工具调用块中，累积内容
+                                            functionCallBuffer += content;
+                                            
+                                            // 检查是否结束
+                                            if (content.includes('<|FunctionCallEnd|>')) {
+                                                const endIndex = content.indexOf('<|FunctionCallEnd|>');
+                                                functionCallBuffer = functionCallBuffer.substring(0, endIndex);
+                                                
+                                                // 解析工具调用
+                                                try {
+                                                    const toolCalls = JSON.parse(functionCallBuffer);
+                                                    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+                                                        hasToolCalls = true;
+                                                        console.log(`[VolcEngineAdapter] 检测到工具调用格式: ${toolCalls.map((tc: any) => tc.name).join(", ")}`);
+                                                        
+                                                        for (let i = 0; i < toolCalls.length; i++) {
+                                                            const toolCall = toolCalls[i];
+                                                            const toolCallId = `tool_call_${Date.now()}_${i}`;
+                                                            toolCallMap.set(i, {
+                                                                id: toolCallId,
+                                                                name: toolCall.name || '',
+                                                                args: JSON.stringify(toolCall.parameters || {})
+                                                            });
+                                                        
+                                                            // 发送工具调用事件
+                                                            eventStream$.sendActionExecutionStart({
+                                                                actionName: toolCall.name,
+                                                                actionExecutionId: toolCallId
+                                                            });
+                                                            
+                                                            // args 必须是字符串格式的 JSON
+                                                            const argsString = typeof toolCall.parameters === 'string' 
+                                                                ? toolCall.parameters 
+                                                                : JSON.stringify(toolCall.parameters || {});
+                                                            
+                                                            eventStream$.sendActionExecutionArgs({
+                                                                actionExecutionId: toolCallId,
+                                                                args: argsString
+                                                            });
+                                                            
+                                                            eventStream$.sendActionExecutionEnd({
+                                                                actionExecutionId: toolCallId
+                                                            });
+                                                        }
+                                                    }
+                                                } catch (e) {
+                                                    console.error(`[VolcEngineAdapter] 解析工具调用格式失败:`, e, functionCallBuffer);
+                                                }
+                                                
+                                                inFunctionCall = false;
+                                                functionCallBuffer = '';
+                                                
+                                                // 处理工具调用后的文本
+                                                const afterText = content.substring(endIndex + '<|FunctionCallEnd|>'.length);
+                                                if (afterText.trim()) {
+                                                    hasContent = true;
+                                                    if (!startedTextMessage) {
+                                                        eventStream$.sendTextMessageStart({ messageId });
+                                                        startedTextMessage = true;
+                                                        eventStream$.sendTextMessageContent({
+                                                            messageId,
+                                                            content: `<!--AUDIO_SESSION:${sessionId}-->`
+                                                        });
+                                                    }
+                                                    eventStream$.sendTextMessageContent({
+                                                        messageId,
+                                                        content: afterText
+                                                    });
+                                                    fullMessageBuffer += afterText;
+                                                    ttsBuffer += afterText;
+                                                }
+                                            }
+                                        } else {
+                                            // 正常文本内容
+                                            hasContent = true;
+                                            if (!startedTextMessage) {
+                                                eventStream$.sendTextMessageStart({ messageId });
+                                                startedTextMessage = true;
+                                                
+                                                eventStream$.sendTextMessageContent({
+                                                    messageId,
+                                                    content: `<!--AUDIO_SESSION:${sessionId}-->`
+                                                });
+                                            }
+                                            
+                                            eventStream$.sendTextMessageContent({
+                                                messageId,
+                                                content: content
+                                            });
+                                            
+                                            fullMessageBuffer += content;
+                                            ttsBuffer += content;
+                                            
+                                            if (ttsBuffer.length >= TTS_THRESHOLD) {
+                                                const chunks = splitTextBySentences(ttsBuffer, TTS_THRESHOLD);
+                                                for (let i = 0; i < chunks.length - 1; i++) {
+                                                    await sendTTSChunk(chunks[i]);
+                                                }
+                                                ttsBuffer = chunks.length > 0 ? chunks[chunks.length - 1] : '';
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('[VolcEngineAdapter] Failed to parse SSE data:', line);
+                                }
                             }
-                            ttsBuffer = chunks.length > 0 ? chunks[chunks.length - 1] : '';
                         }
                     }
                 } catch (llmError: any) {
@@ -1566,15 +1829,46 @@ class VolcEngineAdapter extends OpenAIAdapter {
 
                 // 检查是否收到任何内容
                 if (!hasContent) {
-                    console.warn('[VolcEngineAdapter] No content received from LLM');
-                    if (!startedTextMessage) {
-                        eventStream$.sendTextMessageStart({ messageId });
-                        startedTextMessage = true;
+                    // 如果有工具调用，生成友好的回复
+                    if (hasToolCalls && toolCallMap.size > 0) {
+                        console.log('[VolcEngineAdapter] 工具调用完成，生成确认回复');
+                        const toolNames = Array.from(toolCallMap.values()).map(tc => tc.name);
+                        const actionMap: Record<string, string> = {
+                            'navigateToPage': '页面切换',
+                            'setDashboardMode': '视图模式切换',
+                            'setEmergencyMode': '紧急模式',
+                            'configurePatrol': '巡逻配置',
+                            'generateChart': '图表生成',
+                            'generateInsight': '分析报告生成'
+                        };
+                        
+                        const firstTool = toolNames[0];
+                        let confirmMessage = actionMap[firstTool] || '操作';
+                        if (toolNames.length > 1) {
+                            confirmMessage += `等${toolNames.length}项`;
+                        }
+                        confirmMessage += '已完成';
+                        
+                        if (!startedTextMessage) {
+                            eventStream$.sendTextMessageStart({ messageId });
+                            startedTextMessage = true;
+                        }
+                        eventStream$.sendTextMessageContent({
+                            messageId,
+                            content: confirmMessage
+                        });
+                        fullMessageBuffer = confirmMessage;
+                    } else {
+                        console.warn('[VolcEngineAdapter] No content received from LLM');
+                        if (!startedTextMessage) {
+                            eventStream$.sendTextMessageStart({ messageId });
+                            startedTextMessage = true;
+                        }
+                        eventStream$.sendTextMessageContent({
+                            messageId,
+                            content: '抱歉，未能获取到响应内容。'
+                        });
                     }
-                    eventStream$.sendTextMessageContent({
-                        messageId,
-                        content: '抱歉，未能获取到响应内容。'
-                    });
                 }
 
                 // 发送完成事件

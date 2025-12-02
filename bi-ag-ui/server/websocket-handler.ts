@@ -34,6 +34,8 @@ const TTS_SENTENCE_END = 'TTSSentenceEnd';
 const TTS_DONE = 'TTSDone';
 const BOT_ERROR = 'BotError';
 const BOT_UPDATE_CONFIG = 'BotUpdateConfig';
+const TOOL_CALL = 'ToolCall'; // 工具调用事件
+const TOOL_RESULT = 'ToolResult'; // 工具执行结果事件
 
 // ==================== 类型定义 ====================
 interface WebEvent {
@@ -591,17 +593,94 @@ class VoiceCallService {
   /**
    * 流式生成LLM回复并实时进行TTS合成
    * 边接收LLM内容边合成语音，减少等待时间
+   * 支持工具调用（tool_calls）
    */
   private async *generateStreamingLLMAndTTS(): AsyncGenerator<WebEvent, void, unknown> {
     try {
       const ARK_API_BASE = 'https://ark.cn-beijing.volces.com/api/v3';
       const url = `${ARK_API_BASE}/chat/completions`;
       
+      // 定义工具（与VolcEngineAdapter中的工具定义保持一致）
+      const tools = [
+        {
+          type: "function",
+          function: {
+            name: "navigateToPage",
+            description: "Navigate to a specific page view in the application. Options: dashboard (综合态势), monitor (监控中心), alert (预警中心), patrol (巡查治理), broadcast (广播喊话)",
+            parameters: {
+              type: "object",
+              properties: {
+                page: {
+                  type: "string",
+                  description: "The target page view. Options: dashboard, monitor, alert, patrol, broadcast. Also accepts Chinese: 综合态势/监控中心/预警中心/巡查治理/广播喊话"
+                }
+              },
+              required: ["page"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "setDashboardMode",
+            description: "Change the center panel mode on the dashboard. Options: video-grid (监控墙), map (地图), ai-chat (AI助手)",
+            parameters: {
+              type: "object",
+              properties: {
+                mode: {
+                  type: "string",
+                  description: "The dashboard center panel mode. Options: video-grid (监控墙), map (地图), ai-chat (AI助手)"
+                }
+              },
+              required: ["mode"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "setEmergencyMode",
+            description: "Activate or deactivate emergency response mode",
+            parameters: {
+              type: "object",
+              properties: {
+                active: {
+                  type: "boolean",
+                  description: "True to activate emergency mode, false to deactivate"
+                }
+              },
+              required: ["active"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "configurePatrol",
+            description: "Start or stop automated camera patrolling",
+            parameters: {
+              type: "object",
+              properties: {
+                active: {
+                  type: "boolean",
+                  description: "Start or stop automated camera patrolling"
+                },
+                interval: {
+                  type: "number",
+                  description: "Time interval between camera switches in minutes"
+                }
+              }
+            }
+          }
+        }
+      ];
+      
       const response = await axios.post(
         url,
         {
           model: this.config.LLM_ENDPOINT_ID,
           messages: this.historyMessages,
+          tools: tools,
           stream: true,
           temperature: 0.7,
           max_tokens: 4096
@@ -618,6 +697,9 @@ class VoiceCallService {
       let fullResponse = '';
       let buffer = '';
       let sentenceBuffer = ''; // 累积的句子缓冲区
+      // 工具调用相关变量
+      let toolCallMap = new Map<number, { id: string; name: string; args: string }>(); // index -> tool call info
+      let hasToolCalls = false; // 是否有工具调用
       
       console.log(`[TTS合成] 开始流式合成语音`);
       
@@ -632,6 +714,32 @@ class VoiceCallService {
           if (line.startsWith('data: ')) {
             const data = line.substring(6).trim();
             if (data === '[DONE]') {
+              // 检查是否有工具调用需要处理
+              if (hasToolCalls && toolCallMap.size > 0) {
+                console.log(`[工具调用] 检测到工具调用，暂停TTS合成`);
+                // 发送工具调用事件到前端
+                for (const [index, toolCall] of toolCallMap.entries()) {
+                  try {
+                    const args = JSON.parse(toolCall.args || '{}');
+                    console.log(`[工具调用] 发送工具调用事件: ${toolCall.name}(${JSON.stringify(args)})`);
+                    yield {
+                      event: 'ToolCall',
+                      payload: {
+                        toolCallId: toolCall.id,
+                        toolName: toolCall.name,
+                        arguments: args
+                      }
+                    };
+                  } catch (e) {
+                    console.error(`[工具调用] 解析工具参数失败:`, e);
+                  }
+                }
+                // 等待工具执行结果（这里需要前端返回结果）
+                // 注意：实际实现中，我们需要等待前端通过WebSocket返回工具执行结果
+                // 当前先跳过，等待后续实现
+                return; // 暂时返回，等待工具执行结果
+              }
+              
               // 处理剩余的句子缓冲区
               if (sentenceBuffer.trim()) {
                 yield* this.generateTTSForSentence(sentenceBuffer.trim());
@@ -642,6 +750,39 @@ class VoiceCallService {
             
             try {
               const json = JSON.parse(data);
+              
+              // 检查工具调用
+              const delta = json.choices?.[0]?.delta;
+              if (delta?.tool_calls) {
+                hasToolCalls = true;
+                for (const toolCall of delta.tool_calls) {
+                  const index = toolCall.index;
+                  if (toolCall.id) {
+                    toolCallMap.set(index, {
+                      id: toolCall.id,
+                      name: toolCall.function?.name || '',
+                      args: toolCallMap.get(index)?.args || ''
+                    });
+                  }
+                  if (toolCall.function?.arguments) {
+                    const currentArgs = toolCallMap.get(index)?.args || '';
+                    toolCallMap.set(index, {
+                      id: toolCallMap.get(index)?.id || '',
+                      name: toolCall.function?.name || toolCallMap.get(index)?.name || '',
+                      args: currentArgs + toolCall.function.arguments
+                    });
+                  }
+                }
+                console.log(`[工具调用] 检测到工具调用增量，当前工具数量: ${toolCallMap.size}`);
+                continue; // 工具调用时不处理文本内容
+              }
+              
+              // 检查finish_reason是否为tool_calls
+              if (json.choices?.[0]?.finish_reason === 'tool_calls') {
+                hasToolCalls = true;
+                console.log(`[工具调用] LLM完成，finish_reason为tool_calls`);
+              }
+              
               const content = json.choices?.[0]?.delta?.content || 
                             json.choices?.[0]?.message?.content || 
                             json.content || '';
