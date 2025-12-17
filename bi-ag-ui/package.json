@@ -35,6 +35,8 @@
     "lucide-react": "^0.554.0",
     "multer": "^2.0.2",
     "openai": "^6.9.1",
+    "pinia": "^3.0.4",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "prismjs": "^1.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
