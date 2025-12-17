@@ -35,14 +35,6 @@ export const getUserInfo = (params?: { id?: string | number }) => {
 };
 
 /**
- * 获取不确定类型的数据（使用 any）
- * 适用于：接口返回结构完全未知
- */
-export const getUnknownData = (url: string, params?: any) => {
-  return get<any>(url, params);
-};
-
-/**
  * 更新用户信息
  */
 export const updateUserInfo = (data: Partial<UserInfo>) => {
